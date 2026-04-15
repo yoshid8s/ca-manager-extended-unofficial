@@ -1,0 +1,124 @@
+.cam-admin-wrap {
+	margin-top: 12px;
+}
+
+.cam-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 16px;
+	border-bottom: 1px solid #dcdcde;
+	padding-bottom: 10px;
+}
+
+.cam-tab-button {
+	background: #f6f7f7;
+	border: 1px solid #c3c4c7;
+	padding: 8px 14px;
+	cursor: pointer;
+	border-radius: 6px;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.cam-tab-button.active {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+}
+
+.cam-tab-panel {
+	display: none;
+}
+
+.cam-tab-panel.active {
+	display: block;
+}
+
+.cam-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	padding: 18px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.cam-card h3 {
+	margin-top: 0;
+	margin-bottom: 8px;
+	font-size: 18px;
+}
+
+.cam-select {
+	margin-left: 10px;
+	min-width: 140px;
+}
+
+.cam-json-preview {
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	padding: 14px;
+	border-radius: 6px;
+	overflow: auto;
+	max-height: 420px;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.ca-badge {
+	display: inline-block;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+	vertical-align: middle;
+}
+
+.ca-badge-success {
+	background: #e7f7ed;
+	color: #157347;
+}
+
+.ca-badge-warning {
+	background: #fff3cd;
+	color: #997404;
+}
+
+.ca-badge-error {
+	background: #f8d7da;
+	color: #b02a37;
+}
+
+.ca-badge-default {
+	background: #e9ecef;
+	color: #495057;
+}
+
+.camui-tab-buttons {
+	display: flex;
+	gap: 16px;
+	margin-bottom: 24px;
+}
+
+.camui-tab-button {
+	padding: 12px 20px;
+	border: 2px solid #2271b1;
+	background: #fff;
+	color: #2271b1;
+	border-radius: 6px;
+	font-size: 16px;
+	cursor: pointer;
+}
+
+.camui-tab-button.is-active {
+	background: #2271b1;
+	color: #fff;
+}
+
+.camui-tab-panel {
+	display: none;
+}
+
+.camui-tab-panel.is-active {
+	display: block;
+}

@@ -1,0 +1,42 @@
+services:
+  wordpress:
+    image: "${WORDPRESS_IMAGE:-wordpress}"
+    build:
+      dockerfile: "${WORDPRESS_IMAGE_DOCKERFILE:-}"
+    restart: unless-stopped
+    user: "${WORDPRESS_USER:-www-data}"
+    ports:
+      - "${WORDPRESS_PORT:-9000}:80"
+    extra_hosts:
+      # デバッグ・テスト用 (WP_DEBUG無効時不要)
+      host.docker.internal: host-gateway
+    volumes:
+      - "wordpress_data:/var/www/html"
+      - ".:/var/www/html/wp-content/plugins/ca-manager"
+      - "../..:/workspaces/ca-manager"
+      # デバッグ・テスト用 (WP_DEBUG無効時不要)
+      - "./tmp/profile-test-snapshots:/tmp/profile-test-snapshots"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: "${WORDPRESS_DB_PASSWORD}"
+      WORDPRESS_DEBUG: "${WORDPRESS_DEBUG:-}"
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: mariadb:12.1
+    restart: unless-stopped
+    healthcheck:
+      test: mariadb-admin ping
+      interval: 5s
+    volumes:
+      - mariadb_data_v10:/var/lib/mysql
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: "${WORDPRESS_DB_PASSWORD:?}"
+      MARIADB_ROOT_PASSWORD: "${WORDPRESS_DB_ROOT_PASSWORD:?}"
+volumes:
+  wordpress_data:
+  mariadb_data_v10:

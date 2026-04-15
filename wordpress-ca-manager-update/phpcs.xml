@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<ruleset name="Profile">
+  <rule ref="WordPress" />
+  <exclude-pattern>vendor</exclude-pattern>
+  <exclude-pattern>node_modules</exclude-pattern>
+  <exclude-pattern>playwright-report</exclude-pattern>
+  <rule ref="Squiz.Commenting.ClassComment.Missing">
+    <exclude-pattern>tests</exclude-pattern>
+  </rule>
+  <rule ref="Squiz.Commenting.FileComment.Missing">
+    <exclude-pattern>tests</exclude-pattern>
+  </rule>
+  <rule ref="Squiz.Commenting.FunctionComment.Missing">
+    <exclude-pattern>tests</exclude-pattern>
+  </rule>
+  <rule ref="Squiz.Commenting.FileComment.MissingPackageTag">
+    <exclude-pattern>includes</exclude-pattern>
+  </rule>
+  <rule ref="Squiz.Commenting.FunctionComment.ParamCommentFullStop">
+    <exclude-pattern>includes</exclude-pattern>
+  </rule>
+  <rule ref="Squiz.Commenting.InlineComment.InvalidEndChar">
+    <exclude-pattern>includes</exclude-pattern>
+  </rule>
+  <rule ref="WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents">
+    <exclude-pattern>tests</exclude-pattern>
+  </rule>
+  <rule ref="WordPress.WP.EnqueuedResources.NonEnqueuedScript">
+    <exclude-pattern>includes/post.php</exclude-pattern>
+  </rule>
+  <rule ref="WordPress.PHP.DevelopmentFunctions.error_log_error_log">
+    <exclude-pattern>includes/debug.php</exclude-pattern>
+  </rule>
+</ruleset>
