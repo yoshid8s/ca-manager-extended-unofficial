@@ -11,10 +11,19 @@ WordPress上での実運用を想定して拡張した実装です。
 - 投稿単位でのCA管理
 - 広告CA（OnlineAd）
 - 埋め込みコンテンツCA
+- UIイメージ例（下図）
+
+<img width="1458" height="417" alt="image" src="https://github.com/user-attachments/assets/aa652fb6-77c4-4924-93ba-b69fdb4183b1" />
 
 ## 位置付け
 本実装は、OPにおける「個別セレクター単位でのCA発行」という前提を、
 CMS環境で実装可能にするためのリファレンス実装です。
+
+## 対象ユーザー
+
+- WordPressサイト運営者
+- コンテンツの真正性・出所を証明したい開発者
+- Content Attestation（CA）やOPに関心のある技術者
 
 ## 目次
 
@@ -85,7 +94,7 @@ CMS環境で実装可能にするためのリファレンス実装です。
 
 ```bash
 git clone https://github.com/yoshid8s/ca-manager-extension.git
-WordPressの wp-content/plugins/ に配置してください。
+WordPressの `wp-content/plugins/` に配置し、管理画面から有効化してください。
 ```
 
 ### 方法②（手動）
@@ -108,3 +117,11 @@ HTML構造の変更は検証エラーの原因になります。
 ### 作者
 
 Yoshifumi Takeuchi
+
+## License: 
+
+MIT License
+
+## Notice
+
+This project is based on the official CA Manager developed by the Originator Profile (OP) project, with additional modifications and extensions.
