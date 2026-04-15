@@ -1,5 +1,6 @@
 # ca-manager-extension
-本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったものです
+WordPress用のContent Attestation（CA）発行・検証対応プラグインです。
+本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったものです。
 
 # CA Manager Extension (v0.4.3-1)
 
