@@ -30,6 +30,7 @@ function init() {
 	\add_action( 'transition_post_status', '\Profile\Issue\sign_post', 10, 3 );
 	\add_action( 'save_post', '\Profile\Issue\sign_post_on_save', 20, 3 );
 	\add_filter( 'wp_generate_attachment_metadata', '\Profile\Issue\update_attachment_integrity_metadata', 10, 2 );
+	\add_filter( 'the_content', '\Profile\Issue\inject_text_target_ids_into_front_html', 98 );
 	\add_filter( 'the_content', '\Profile\Issue\inject_embedded_image_ids_into_front_html', 99 );
 }
 
@@ -114,6 +115,41 @@ function issue_post_cas( \WP_Post $post ) {
 	foreach ( \get_attached_media( 'image', $post->ID ) as $attachment ) {
 		$metadata = \wp_get_attachment_metadata( $attachment->ID );
 		update_attachment_integrity_metadata( $metadata, $attachment->ID );
+	}
+
+	$embedded_items = \get_post_meta( $post->ID, '_cam_embedded_items', true );
+
+	if ( \is_array( $embedded_items ) && ! empty( $embedded_items ) ) {
+		foreach ( $embedded_items as $item ) {
+			$kind      = isset( $item['kind'] ) ? (string) $item['kind'] : '';
+			$image_url = isset( $item['image_url'] ) ? (string) $item['image_url'] : '';
+
+			if ( 'image' !== $kind || '' === $image_url ) {
+				continue;
+			}
+
+			$attachment_id = \attachment_url_to_postid( $image_url );
+
+			if ( ! $attachment_id ) {
+				debug( 'issue_post_cas embedded image attachment not found for url=' . $image_url );
+				continue;
+			}
+
+			$existing_integrity = \get_post_meta( $attachment_id, '_profile_attachment_integrity', true );
+			if ( \is_array( $existing_integrity ) && ! empty( $existing_integrity ) ) {
+				debug( 'issue_post_cas embedded image integrity already exists for attachment_id=' . $attachment_id );
+				continue;
+			}
+
+			$metadata = \wp_get_attachment_metadata( $attachment_id );
+			if ( ! \is_array( $metadata ) || empty( $metadata['file'] ) ) {
+				debug( 'issue_post_cas embedded image metadata missing for attachment_id=' . $attachment_id );
+				continue;
+			}
+
+			update_attachment_integrity_metadata( $metadata, $attachment_id );
+			debug( 'issue_post_cas generated integrity for embedded attachment_id=' . $attachment_id );
+		}
 	}
 
 	$admin_secret = \get_option( 'profile_ca_server_admin_secret' );
@@ -607,6 +643,8 @@ function add_ids_to_paragraphs_for_ca( string $html ): string {
 		return $html;
 	}
 
+	$seen_ids = array();
+
 	foreach ( $nodes as $node ) {
 		if ( ! $node instanceof \DOMElement ) {
 			continue;
@@ -617,11 +655,29 @@ function add_ids_to_paragraphs_for_ca( string $html ): string {
 		}
 
 		if ( $node->hasAttribute( 'id' ) ) {
-			continue;
+			$current_id = (string) $node->getAttribute( 'id' );
+
+			// 既存の op-body-* は一度捨てて再計算する
+			if ( 0 !== strpos( $current_id, 'op-body-' ) ) {
+				continue;
+			}
+
+			$node->removeAttribute( 'id' );
 		}
 
-		$text = profile_normalize_paragraph_text( $node->textContent );
-		$node->setAttribute( 'id', profile_paragraph_id_from_text( $text ) );
+		$text    = profile_normalize_paragraph_text( $node->textContent );
+		$base_id = profile_paragraph_id_from_text( $text );
+		$final_id = $base_id;
+
+		if ( ! isset( $seen_ids[ $base_id ] ) ) {
+			$seen_ids[ $base_id ] = 1;
+		} else {
+			$seen_ids[ $base_id ]++;
+			$final_id = $base_id . '-' . $seen_ids[ $base_id ];
+			debug( 'add_ids_to_paragraphs_for_ca duplicate id adjusted: ' . $base_id . ' -> ' . $final_id );
+		}
+
+		$node->setAttribute( 'id', $final_id );
 	}
 
 	return $doc->saveHTML();
@@ -803,6 +859,26 @@ function add_ids_to_embedded_images_for_ca( string $html, array $embedded_items 
 	libxml_clear_errors();
 
 	return is_string( $result ) ? $result : $html;
+}
+
+/**
+ * 公開HTMLにも本文 target 用 id を付与する
+ *
+ * @param string $content the_content 後のHTML
+ * @return string
+ */
+function inject_text_target_ids_into_front_html( string $content ): string {
+	if ( ! \is_singular( array( 'post', 'page' ) ) ) {
+		return $content;
+	}
+
+	if ( '' === trim( $content ) ) {
+		return $content;
+	}
+
+	debug( 'inject_text_target_ids_into_front_html called' );
+
+	return add_ids_to_paragraphs_for_ca( $content );
 }
 
 /**
@@ -1063,6 +1139,17 @@ function create_embedded_uca(
 		$raw_integrities = external_resources_from_html( $target_html, '//img[@integrity]' );
 		if ( ! empty( $raw_integrities ) && is_string( $raw_integrities[0] ) ) {
 			$image_target_integrity = trim( preg_replace( '/\s+/', ' ', $raw_integrities[0] ) );
+		}
+
+		// HTML 上に integrity が無い場合は attachment メタからフォールバック
+		if ( null === $image_target_integrity || '' === $image_target_integrity ) {
+			$image_target_integrity = find_attachment_all_integrities_by_image_url( $image_url );
+
+			debug(
+				'create_embedded_uca image fallback integrities from attachment=' .
+				( $image_target_integrity ?: '(null)' ) .
+				', image_url=' . $image_url
+			);
 		}
 
 		debug(
@@ -1345,7 +1432,7 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 			}
 		}
 
-		$main_external_resources = $has_embedded_image ? array() : $external_resources;
+		$main_external_resources = $external_resources;
 
 		debug(
 			'MAIN_EXTERNAL_RESOURCES mode=' .
