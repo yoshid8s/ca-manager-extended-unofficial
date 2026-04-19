@@ -97,14 +97,159 @@ function register_settings() {
 /** 設定画面 */
 function settings_page() {
 	?>
-		<div class="wrap">
-			<h1>CA Manager</h1>
-			<form method="post" action="options.php">
-				<?php \settings_fields( 'ca-manager' ); ?>
-				<?php \do_settings_sections( 'ca-manager' ); ?>
-				<?php \submit_button(); ?>
-			</form>
-		</div>
+	<div class="wrap">
+		<?php
+		if ( isset( $_GET['cam_bulk_issue_done'] ) ) {
+			$total    = isset( $_GET['total'] ) ? \absint( $_GET['total'] ) : 0;
+			$success  = isset( $_GET['success'] ) ? \absint( $_GET['success'] ) : 0;
+			$skipped  = isset( $_GET['skipped'] ) ? \absint( $_GET['skipped'] ) : 0;
+			$failed   = isset( $_GET['failed'] ) ? \absint( $_GET['failed'] ) : 0;
+			$warnings = isset( $_GET['warnings'] ) ? \absint( $_GET['warnings'] ) : 0;
+
+			$report = array();
+
+			if ( \function_exists( '\Profile\Issue\cam_get_bulk_article_ca_report' ) ) {
+				$report = \Profile\Issue\cam_get_bulk_article_ca_report();
+			}
+
+			if ( $failed > 0 ) {
+				echo '<div class="notice notice-warning is-dismissible"><p>';
+				echo '記事CA一括発行を実行しました。対象 ' . \esc_html( $total ) . ' 件中、成功 ' . \esc_html( $success ) . ' 件、スキップ ' . \esc_html( $skipped ) . ' 件、失敗 ' . \esc_html( $failed ) . ' 件、注意 ' . \esc_html( $warnings ) . ' 件です。';
+				echo '</p></div>';
+			} else {
+				echo '<div class="notice notice-success is-dismissible"><p>';
+				echo '記事CA一括発行を実行しました。対象 ' . \esc_html( $total ) . ' 件中、成功 ' . \esc_html( $success ) . ' 件、スキップ ' . \esc_html( $skipped ) . ' 件、失敗 0 件、注意 ' . \esc_html( $warnings ) . ' 件です。';
+				echo '</p></div>';
+			}
+
+			$failed_items  = isset( $report['failed_items'] ) && \is_array( $report['failed_items'] ) ? $report['failed_items'] : array();
+			$warning_items = isset( $report['warning_items'] ) && \is_array( $report['warning_items'] ) ? $report['warning_items'] : array();
+
+			if ( ! empty( $failed_items ) ) {
+				echo '<div class="notice notice-error"><p><strong>失敗ページ</strong></p><ul>';
+				foreach ( $failed_items as $item ) {
+					$title    = isset( $item['title'] ) ? $item['title'] : '';
+					$edit_url = isset( $item['edit_url'] ) ? $item['edit_url'] : '';
+					$view_url = isset( $item['view_url'] ) ? $item['view_url'] : '';
+					$reason   = isset( $item['reason'] ) ? $item['reason'] : '';
+					$post_id  = isset( $item['post_id'] ) ? (int) $item['post_id'] : 0;
+
+					echo '<li>';
+					echo 'ID ' . \esc_html( (string) $post_id ) . ' : ' . \esc_html( $title );
+					if ( '' !== $edit_url ) {
+						echo ' [<a href="' . \esc_url( $edit_url ) . '">編集</a>]';
+					}
+					if ( '' !== $view_url ) {
+						echo ' [<a href="' . \esc_url( $view_url ) . '" target="_blank" rel="noopener noreferrer">表示</a>]';
+					}
+					if ( '' !== $reason ) {
+						echo ' - ' . \esc_html( $reason );
+					}
+					echo '</li>';
+				}
+				echo '</ul></div>';
+			}
+
+			if ( ! empty( $warning_items ) ) {
+				echo '<div class="notice notice-warning"><p><strong>成功だが検証失敗の可能性あり</strong></p><ul>';
+				foreach ( $warning_items as $item ) {
+					$title    = isset( $item['title'] ) ? $item['title'] : '';
+					$edit_url = isset( $item['edit_url'] ) ? $item['edit_url'] : '';
+					$view_url = isset( $item['view_url'] ) ? $item['view_url'] : '';
+					$reason   = isset( $item['reason'] ) ? $item['reason'] : '';
+					$post_id  = isset( $item['post_id'] ) ? (int) $item['post_id'] : 0;
+
+					echo '<li>';
+					echo 'ID ' . \esc_html( (string) $post_id ) . ' : ' . \esc_html( $title );
+					if ( '' !== $edit_url ) {
+						echo ' [<a href="' . \esc_url( $edit_url ) . '">編集</a>]';
+					}
+					if ( '' !== $view_url ) {
+						echo ' [<a href="' . \esc_url( $view_url ) . '" target="_blank" rel="noopener noreferrer">表示</a>]';
+					}
+					if ( '' !== $reason ) {
+						echo ' - ' . \esc_html( $reason );
+					}
+					echo '</li>';
+				}
+				echo '</ul></div>';
+			}
+
+			if ( \function_exists( '\Profile\Issue\cam_delete_bulk_article_ca_report' ) ) {
+				\Profile\Issue\cam_delete_bulk_article_ca_report();
+			}
+		}
+		?>
+
+		<h1>CA Manager</h1>
+
+		<form method="post" action="options.php">
+			<?php \settings_fields( 'ca-manager' ); ?>
+			<?php \do_settings_sections( 'ca-manager' ); ?>
+			<?php \submit_button(); ?>
+		</form>
+
+		<hr style="margin: 32px 0;">
+
+		<h2>記事CA一括発行</h2>
+		<p>公開済みの記事・固定ページのうち、記事CAが未発行のページに対してのみ、記事CAを一括発行します。</p>
+
+		<?php
+		$cam_unissued_count = 0;
+
+		if ( \function_exists( '\Profile\Issue\cam_get_posts_without_main_article_ca' ) ) {
+			$cam_unissued_ids   = \Profile\Issue\cam_get_posts_without_main_article_ca();
+			$cam_unissued_count = \is_array( $cam_unissued_ids ) ? \count( $cam_unissued_ids ) : 0;
+		}
+		?>
+
+		<p>
+			<strong>記事CA未発行件数:</strong>
+			<?php echo \esc_html( $cam_unissued_count ); ?> 件
+		</p>
+
+		<form method="post" action="<?php echo \esc_url( \admin_url( 'admin-post.php' ) ); ?>" style="max-width: 720px;">
+			<?php \wp_nonce_field( 'cam_bulk_issue_article_ca_action', 'cam_bulk_issue_article_ca_nonce' ); ?>
+			<input type="hidden" name="action" value="cam_bulk_issue_article_ca">
+
+			<table class="form-table" role="presentation">
+				<tbody>
+					<tr>
+						<th scope="row">
+							<label for="cam_bulk_editor_name">編集責任者</label>
+						</th>
+						<td>
+							<input
+								type="text"
+								id="cam_bulk_editor_name"
+								name="cam_bulk_editor_name"
+								value=""
+								class="regular-text"
+								placeholder="例: Y&amp;H Inc."
+							/>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="cam_bulk_author_name">執筆者</label>
+						</th>
+						<td>
+							<input
+								type="text"
+								id="cam_bulk_author_name"
+								name="cam_bulk_author_name"
+								value=""
+								class="regular-text"
+								placeholder="例: Yoshifumi Takeuchi"
+							/>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<?php \submit_button( '未発行の記事CAを一括発行', 'secondary', 'submit', false ); ?>
+		</form>
+	</div>
 	<?php
 }
 

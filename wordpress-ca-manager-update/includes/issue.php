@@ -25,10 +25,924 @@ use function Profile\Debug\debug;
 require_once __DIR__ . '/url.php';
 use function Profile\Url\add_page_query;
 
+/**
+ * Base64URL decode
+ *
+ * @param string $input Input string.
+ * @return string
+ */
+function cam_base64url_decode( string $input ): string {
+	$remainder = strlen( $input ) % 4;
+
+	if ( $remainder ) {
+		$input .= str_repeat( '=', 4 - $remainder );
+	}
+
+	$input = strtr( $input, '-_', '+/' );
+
+	$decoded = base64_decode( $input, true );
+
+	return false === $decoded ? '' : $decoded;
+}
+
+/**
+ * CAS JWT payload を配列で返す
+ *
+ * @param string $jwt JWT string.
+ * @return array
+ */
+function cam_decode_cas_jwt_payload( string $jwt ): array {
+	$parts = explode( '.', $jwt );
+
+	if ( count( $parts ) < 2 ) {
+		return array();
+	}
+
+	$payload_json = cam_base64url_decode( $parts[1] );
+
+	if ( '' === $payload_json ) {
+		return array();
+	}
+
+	$payload = json_decode( $payload_json, true );
+
+	return is_array( $payload ) ? $payload : array();
+}
+
+/**
+ * 投稿タイトル要素の selector を返す
+ *
+ * 優先順位:
+ * 1. 通常のページ/投稿タイトル領域（page-header / entry-header）
+ *    - 見出し要素自身に op-body-* が付く場合
+ *    - 見出し子要素に op-body-* が付く場合
+ * 2. トップページ等のバナー見出し（banner-title）
+ *    - 見出し要素自身に op-body-* が付く場合
+ *    - 見出し子要素に op-body-* が付く場合
+ * 3. 取れない場合は create_uca_list() と同じ ID 生成ルールでフォールバック
+ *
+ * @param \WP_Post $post Post object.
+ * @return string
+ */
+function cam_get_post_title_target_selector( \WP_Post $post ): string {
+	$post_title = (string) \get_the_title( $post );
+
+	if ( '' === $post_title ) {
+		debug( 'TITLE_SELECTOR_EMPTY_TITLE, post_id=' . $post->ID );
+		return '';
+	}
+
+	// create_uca_list() とできるだけ近い形で HTML を組み立てる
+	$content = \apply_filters( 'the_content', $post->post_content );
+
+	$html  = '<div class="cam-title-check-root">';
+
+	// 通常のページ/投稿タイトル領域
+	$html .= '<header class="page-header">';
+	$html .= '<h1 class="page-title">' . $post_title . '</h1>';
+	$html .= '</header>';
+
+	// トップページ・テーマのバナー見出し対策
+	$html .= '<div id="wp-custom-header" class="wp-custom-header"></div>';
+	$html .= '<div class="banner-caption">';
+	$html .= '<div class="container">';
+	$html .= '<h2 class="banner-title">' . $post_title . '</h2>';
+	$html .= '</div>';
+	$html .= '</div>';
+
+	// 本文
+	$html .= '<div class="entry-content">' . $content . '</div>';
+	$html .= '</div>';
+
+	$html = add_ids_to_paragraphs_for_ca( $html );
+
+	libxml_use_internal_errors( true );
+
+	$doc = new \DOMDocument();
+	$loaded = $doc->loadHTML(
+		'<?xml encoding="utf-8" ?>' . $html,
+		LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+	);
+
+	if ( $loaded ) {
+		$xpath = new \DOMXPath( $doc );
+
+		$queries = array(
+			// 1) 通常のタイトル領域: 見出し要素自身に id が付く場合
+			'//header[contains(@class,"page-header")]//*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6][@id and starts-with(@id, "op-body-")]',
+			'//header[contains(@class,"entry-header")]//*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6][@id and starts-with(@id, "op-body-")]',
+
+			// 2) 通常のタイトル領域: 見出しの子要素に id が付く場合
+			'//header[contains(@class,"page-header")]//*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6]//*[@id and starts-with(@id, "op-body-")]',
+			'//header[contains(@class,"entry-header")]//*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6]//*[@id and starts-with(@id, "op-body-")]',
+
+			// 3) バナー見出し: 見出し要素自身に id が付く場合
+			'//*[contains(@class,"banner-caption")]//*[contains(@class,"banner-title")][@id and starts-with(@id, "op-body-")]',
+
+			// 4) バナー見出し: 子要素に id が付く場合
+			'//*[contains(@class,"banner-caption")]//*[contains(@class,"banner-title")]//*[@id and starts-with(@id, "op-body-")]',
+
+			// 5) wp-custom-header 近傍: 見出し要素自身に id が付く場合
+			'//*[@id="wp-custom-header"]/following-sibling::*[contains(@class,"banner-caption")]//*[contains(@class,"banner-title")][@id and starts-with(@id, "op-body-")]',
+
+			// 6) wp-custom-header 近傍: 子要素に id が付く場合
+			'//*[@id="wp-custom-header"]/following-sibling::*[contains(@class,"banner-caption")]//*[contains(@class,"banner-title")]//*[@id and starts-with(@id, "op-body-")]',
+		);
+
+		foreach ( $queries as $query ) {
+			$nodes = $xpath->query( $query );
+
+			if ( $nodes && 0 < $nodes->length ) {
+				$node = $nodes->item( 0 );
+
+				if ( $node instanceof \DOMElement ) {
+					$id = $node->getAttribute( 'id' );
+
+					if ( '' !== $id ) {
+						debug( 'TITLE_SELECTOR_DOM=#' . $id . ', post_id=' . $post->ID . ', query=' . $query );
+						return '#' . $id;
+					}
+				}
+			}
+		}
+	}
+
+	// フォールバック
+	$title_id = profile_paragraph_id_from_text( $post_title );
+
+	debug( 'TITLE_SELECTOR_FALLBACK=#' . $title_id . ', post_id=' . $post->ID );
+
+	if ( '' === $title_id ) {
+		return '';
+	}
+
+	return '#' . $title_id;
+}
+
+/**
+ * 既存CASの中に main記事CA があるか判定
+ *
+ * 判定条件:
+ * - credentialSubject.type = Article
+ * - credentialSubject.datePublished がある
+ * - credentialSubject.dateModified がある
+ * - target[0].type = TextTargetIntegrity
+ *
+ * @param int $post_id Post ID.
+ * @return bool
+ */
+function cam_has_main_article_ca( int $post_id ): bool {
+	$post_id = \absint( $post_id );
+
+	if ( ! $post_id ) {
+		return false;
+	}
+
+	$post_cas = \get_post_meta( $post_id, '_profile_post_cas', true );
+
+	$cas_count = \is_array( $post_cas ) ? count( $post_cas ) : 0;
+	debug( "CAS_COUNT: post_id={$post_id}, cas_count={$cas_count}" );
+
+	if ( ! \is_array( $post_cas ) || empty( $post_cas ) ) {
+		return false;
+	}
+
+	foreach ( $post_cas as $cas_jwt ) {
+		if ( ! \is_string( $cas_jwt ) || '' === $cas_jwt ) {
+			continue;
+		}
+
+		$payload = cam_decode_cas_jwt_payload( $cas_jwt );
+
+		if ( empty( $payload ) ) {
+			continue;
+		}
+
+		if ( cam_is_main_article_ca_signature( $payload ) ) {
+			$targets       = $payload['target'] ?? array();
+			$first_target  = \is_array( $targets ) && ! empty( $targets ) ? ( $targets[0] ?? array() ) : array();
+			$selector      = \is_array( $first_target ) ? ( $first_target['cssSelector'] ?? '' ) : '';
+
+			debug( "MATCH_MAIN_CA_SIGNATURE: post_id={$post_id}, selector={$selector}" );
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * main記事CAが未発行の投稿IDを取得
+ *
+ * @return array
+ */
+function cam_get_posts_without_main_article_ca(): array {
+	$args = array(
+		'post_type'      => array( 'post', 'page' ),
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'orderby'        => 'date',
+		'order'          => 'ASC',
+	);
+
+	$post_ids = \get_posts( $args );
+
+	if ( ! \is_array( $post_ids ) || empty( $post_ids ) ) {
+		return array();
+	}
+
+	$targets = array();
+
+	foreach ( $post_ids as $post_id ) {
+		$post_id = \absint( $post_id );
+
+		if ( cam_should_skip_bulk_article_ca_post( $post_id ) ) {
+			continue;
+		}
+
+		$has_ca = cam_has_main_article_ca( $post_id );
+
+		debug( "CHECK_POST: post_id={$post_id}, has_main_article_ca=" . ( $has_ca ? 'true' : 'false' ) );
+
+		if ( ! $has_ca ) {
+			debug( "TARGET_POST: post_id={$post_id}" );
+			$targets[] = $post_id;
+		}
+	}
+
+	return $targets;
+}
+
+/**
+ * payload が main記事CAの特徴を満たすか判定
+ *
+ * main記事CAの特徴:
+ * - credentialSubject.type = Article
+ * - credentialSubject.datePublished がある
+ * - credentialSubject.dateModified がある
+ * - target[0].type = TextTargetIntegrity
+ *
+ * @param array $payload Payload
+ * @return bool
+ */
+function cam_is_main_article_ca_signature( array $payload ): bool {
+	$subject      = $payload['credentialSubject'] ?? array();
+	$subject_type = $subject['type'] ?? '';
+	$date_pub     = $subject['datePublished'] ?? '';
+	$date_mod     = $subject['dateModified'] ?? '';
+	$targets      = $payload['target'] ?? array();
+
+	if ( 'Article' !== $subject_type ) {
+		return false;
+	}
+
+	if ( '' === $date_pub || '' === $date_mod ) {
+		return false;
+	}
+
+	if ( ! \is_array( $targets ) || empty( $targets ) ) {
+		return false;
+	}
+
+	$first_target = $targets[0] ?? array();
+
+	if ( ! \is_array( $first_target ) ) {
+		return false;
+	}
+
+	$target_type = $first_target['type'] ?? '';
+
+	return 'TextTargetIntegrity' === $target_type;
+}
+
+/**
+ * 一括記事CA発行の対象外にする投稿か判定
+ *
+ * 現時点ではトップページを対象外にする。
+ *
+ * @param int $post_id Post ID
+ * @return bool
+ */
+function cam_should_skip_bulk_article_ca_post( int $post_id ): bool {
+	$post_id = \absint( $post_id );
+
+	if ( ! $post_id ) {
+		return true;
+	}
+
+	$front_page_id = (int) \get_option( 'page_on_front' );
+
+	if ( $front_page_id > 0 && $front_page_id === $post_id ) {
+		debug( "SKIP_BULK_FRONT_PAGE: post_id={$post_id}" );
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * 記事CAの検証失敗リスクを簡易判定
+ *
+ * これは確定判定ではなく、HTML実体参照や引用符など、
+ * ハッシュ不一致を起こしやすい文字を含む場合に注意扱いとする。
+ *
+ * @param \WP_Post $post Post object.
+ * @return array
+ */
+function cam_detect_article_ca_warning_reasons( \WP_Post $post ): array {
+	$reasons = array();
+
+	$title   = (string) \get_the_title( $post );
+	$content = (string) $post->post_content;
+	$body    = $title . "\n" . $content;
+
+	// HTML entity
+	if ( preg_match( '/&(?:[a-zA-Z][a-zA-Z0-9]+|#\d+|#x[0-9A-Fa-f]+);/', $body ) ) {
+		$reasons[] = 'HTML実体参照を含む';
+	}
+
+	// 単純な引用符・アポストロフィ・曲線引用符
+	if ( preg_match( '/["\']|[’‘“”]/u', $body ) ) {
+		$reasons[] = '引用符/アポストロフィを含む';
+	}
+
+	// ampersand
+	if ( false !== strpos( $body, '&' ) ) {
+		$reasons[] = '& を含む';
+	}
+
+	return array_values( array_unique( $reasons ) );
+}
+
+/**
+ * 一括発行レポートを保存
+ *
+ * @param array $report Report data.
+ * @return void
+ */
+function cam_store_bulk_article_ca_report( array $report ): void {
+	$user_id = \get_current_user_id();
+
+	if ( ! $user_id ) {
+		return;
+	}
+
+	\set_transient( 'cam_bulk_article_ca_report_' . $user_id, $report, 10 * MINUTE_IN_SECONDS );
+}
+
+/**
+ * 一括発行レポートを取得
+ *
+ * @return array
+ */
+function cam_get_bulk_article_ca_report(): array {
+	$user_id = \get_current_user_id();
+
+	if ( ! $user_id ) {
+		return array();
+	}
+
+	$report = \get_transient( 'cam_bulk_article_ca_report_' . $user_id );
+
+	return \is_array( $report ) ? $report : array();
+}
+
+/**
+ * 一括発行レポートを削除
+ *
+ * @return void
+ */
+function cam_delete_bulk_article_ca_report(): void {
+	$user_id = \get_current_user_id();
+
+	if ( ! $user_id ) {
+		return;
+	}
+
+	\delete_transient( 'cam_bulk_article_ca_report_' . $user_id );
+}
+
+/**
+ * 記事CA用メタの現在値を取得
+ *
+ * @param int $post_id Post ID.
+ * @return array
+ */
+function cam_get_article_meta_snapshot( int $post_id ): array {
+	$post_id = \absint( $post_id );
+
+	return array(
+		'status' => (string) \get_post_meta( $post_id, '_cam_article_ca_status', true ),
+		'editor' => (string) \get_post_meta( $post_id, '_cam_editor_name', true ),
+		'author' => (string) \get_post_meta( $post_id, '_cam_author_name', true ),
+	);
+}
+
+/**
+ * 記事CA用メタを復元
+ *
+ * @param int   $post_id Post ID.
+ * @param array $snapshot Snapshot.
+ * @return void
+ */
+function cam_restore_article_meta_snapshot( int $post_id, array $snapshot ): void {
+	$post_id = \absint( $post_id );
+
+	if ( ! $post_id ) {
+		return;
+	}
+
+	$status = isset( $snapshot['status'] ) ? (string) $snapshot['status'] : '';
+	$editor = isset( $snapshot['editor'] ) ? (string) $snapshot['editor'] : '';
+	$author = isset( $snapshot['author'] ) ? (string) $snapshot['author'] : '';
+
+	if ( '' === $status ) {
+		\delete_post_meta( $post_id, '_cam_article_ca_status' );
+	} else {
+		\update_post_meta( $post_id, '_cam_article_ca_status', $status );
+	}
+
+	if ( '' === $editor ) {
+		\delete_post_meta( $post_id, '_cam_editor_name' );
+	} else {
+		\update_post_meta( $post_id, '_cam_editor_name', $editor );
+	}
+
+	if ( '' === $author ) {
+		\delete_post_meta( $post_id, '_cam_author_name' );
+	} else {
+		\update_post_meta( $post_id, '_cam_author_name', $author );
+	}
+}
+
+/**
+ * 一括発行用に記事CAメタを一時適用
+ *
+ * @param int    $post_id Post ID.
+ * @param string $editor_name Editor name.
+ * @param string $author_name Author name.
+ * @return void
+ */
+function cam_apply_bulk_article_meta_values( int $post_id, string $editor_name = '', string $author_name = '' ): void {
+	$post_id = \absint( $post_id );
+
+	if ( ! $post_id ) {
+		return;
+	}
+
+	$editor_name = \trim( $editor_name );
+	$author_name = \trim( $author_name );
+
+	if ( '' !== $editor_name ) {
+		\update_post_meta( $post_id, '_cam_editor_name', $editor_name );
+	}
+
+	if ( '' !== $author_name ) {
+		\update_post_meta( $post_id, '_cam_author_name', $author_name );
+	}
+}
+
+/**
+ * CAS payload が main記事CA か判定
+ *
+ * @param array  $payload Payload
+ * @param string $title_selector タイトル selector
+ * @return bool
+ */
+function cam_is_main_article_ca_payload( array $payload, string $title_selector ): bool {
+	$subject      = $payload['credentialSubject'] ?? array();
+	$subject_type = $subject['type'] ?? '';
+	$date_pub     = $subject['datePublished'] ?? '';
+	$date_mod     = $subject['dateModified'] ?? '';
+	$targets      = $payload['target'] ?? array();
+
+	if ( 'Article' !== $subject_type ) {
+		return false;
+	}
+
+	if ( '' === $date_pub || '' === $date_mod ) {
+		return false;
+	}
+
+	if ( ! \is_array( $targets ) || empty( $targets ) ) {
+		return false;
+	}
+
+	$first_target = $targets[0] ?? array();
+
+	if ( ! \is_array( $first_target ) ) {
+		return false;
+	}
+
+	$target_type = $first_target['type'] ?? '';
+	$selector    = $first_target['cssSelector'] ?? '';
+
+	if ( 'TextTargetIntegrity' !== $target_type ) {
+		return false;
+	}
+
+	return $title_selector === $selector;
+}
+
+/**
+ * 投稿の既存 CAS 配列を返す
+ *
+ * @param int $post_id Post ID
+ * @return array
+ */
+function cam_get_existing_post_cas( int $post_id ): array {
+	$post_id = \absint( $post_id );
+
+	if ( ! $post_id ) {
+		return array();
+	}
+
+	$post_cas = \get_post_meta( $post_id, '_profile_post_cas', true );
+
+	return \is_array( $post_cas ) ? $post_cas : array();
+}
+
+/**
+ * 記事CAだけを既存 CAS にマージ保存
+ *
+ * - 既存の embedded text / embedded image / ad は残す
+ * - 既存の main記事CA があれば置き換える
+ *
+ * @param int   $post_id Post ID
+ * @param array $new_cas_items 新しい CAS JWT 配列
+ * @return bool
+ */
+/**
+ * 記事CAだけを既存 CAS にマージ保存
+ *
+ * - 既存の embedded text / embedded image / ad は残す
+ * - 既存の main記事CA があれば置き換える
+ *
+ * @param int   $post_id Post ID
+ * @param array $new_cas_items 新しい CAS JWT 配列
+ * @return bool
+ */
+function cam_merge_main_article_cas_into_post( int $post_id, array $new_cas_items ): bool {
+	$post_id = \absint( $post_id );
+
+	if ( ! $post_id ) {
+		return false;
+	}
+
+	$post = \get_post( $post_id );
+
+	if ( ! $post instanceof \WP_Post ) {
+		return false;
+	}
+
+	$existing_cas = cam_get_existing_post_cas( $post_id );
+	$kept_cas     = array();
+	$new_main_cas = array();
+
+	// 既存CASから main記事CA だけ除外し、それ以外は残す
+	foreach ( $existing_cas as $existing_jwt ) {
+		if ( ! \is_string( $existing_jwt ) || '' === $existing_jwt ) {
+			continue;
+		}
+
+		$payload = cam_decode_cas_jwt_payload( $existing_jwt );
+
+		if ( ! empty( $payload ) && cam_is_main_article_ca_signature( $payload ) ) {
+			continue;
+		}
+
+		$kept_cas[] = $existing_jwt;
+	}
+
+	// 新しい記事CAを先頭用に集める
+	foreach ( $new_cas_items as $new_jwt ) {
+		if ( \is_string( $new_jwt ) && '' !== $new_jwt ) {
+			$new_main_cas[] = $new_jwt;
+		}
+	}
+
+	// main記事CAを先頭、その後ろに既存の埋め込みCA等を残す
+	$merged_cas = array_merge( $new_main_cas, $kept_cas );
+
+	\update_post_meta( $post_id, '_profile_post_cas', $merged_cas );
+	\update_post_meta( $post_id, '_cam_article_ca_issued', '1' );
+	\update_post_meta( $post_id, '_cam_article_ca_last_issued', \current_time( 'mysql' ) );
+	\update_post_meta( $post_id, '_cam_article_ca_status', 'success' );
+
+	debug( "cam_merge_main_article_cas_into_post saved _profile_post_cas for post_id={$post_id}" );
+
+	return true;
+}
+
+/**
+ * main記事CA 用の UCA を作る
+ *
+ * create_uca_list() の先頭要素（main UCA）だけを使う
+ *
+ * @param \WP_Post $post Post object
+ * @param string   $issuer_id Issuer ID
+ * @return Uca|false
+ */
+function cam_build_main_article_uca_for_post( \WP_Post $post, string $issuer_id ) {
+	$uca_list = create_uca_list( $post, $issuer_id );
+
+	if ( ! \is_array( $uca_list ) || empty( $uca_list ) ) {
+		debug( "cam_build_main_article_uca_for_post: empty uca_list for post_id={$post->ID}" );
+		return false;
+	}
+
+	$main_uca = $uca_list[0] ?? false;
+
+	if ( ! $main_uca instanceof Uca ) {
+		debug( "cam_build_main_article_uca_for_post: first UCA is invalid for post_id={$post->ID}" );
+		return false;
+	}
+
+	// 念のため main記事CA か確認
+	$main_json = $main_uca->to_json();
+
+	debug( "MAIN_JSON_EXISTS=" . ( ( false !== $main_json && '' !== $main_json ) ? 'yes' : 'no' ) );
+
+	if ( false === $main_json || '' === $main_json ) {
+		debug( "cam_build_main_article_uca_for_post: main UCA json empty for post_id={$post->ID}" );
+		return false;
+	}
+
+	$payload = \json_decode( $main_json, true );
+
+	if ( ! \is_array( $payload ) ) {
+		debug( "cam_build_main_article_uca_for_post: main UCA json decode failed for post_id={$post->ID}" );
+		return false;
+	}
+
+	$subject = $payload['credentialSubject'] ?? [];
+	$targets = $payload['target'] ?? [];
+
+	debug( 'MAIN_SUBJECT_TYPE=' . ( $subject['type'] ?? '' ) );
+	debug( 'MAIN_HEADLINE=' . ( $subject['headline'] ?? '' ) );
+	debug( 'MAIN_TARGET_COUNT_FROM_JSON=' . ( \is_array( $targets ) ? \count( $targets ) : 0 ) );
+
+	if ( \is_array( $targets ) && ! empty( $targets ) ) {
+		$ft = $targets[0];
+
+		debug(
+			'MAIN_FIRST_TARGET'
+			. ' type=' . ( $ft['type'] ?? '' )
+			. ', selector=' . ( $ft['cssSelector'] ?? '' )
+			. ', integrity=' . ( empty( $ft['integrity'] ) ? '(empty)' : $ft['integrity'] )
+		);
+	}
+
+	$title_selector = cam_get_post_title_target_selector( $post );
+
+	if ( ! cam_is_main_article_ca_signature( $payload ) ) {
+		debug( "cam_build_main_article_uca_for_post: first UCA is not main article signature for post_id={$post->ID}" );
+		return false;
+	}
+
+	return $main_uca;
+}
+
+/**
+ * 投稿1件に対して main記事CA だけを発行
+ *
+ * @param int $post_id Post ID
+ * @return bool
+ */
+/**
+ * 投稿1件に対して main記事CA だけを発行
+ *
+ * @param int    $post_id Post ID
+ * @param string $editor_name 編集責任者
+ * @param string $author_name 執筆者
+ * @return bool
+ */
+function cam_issue_main_article_ca_for_post( int $post_id, string $editor_name = '', string $author_name = '' ): bool {
+	$post_id = \absint( $post_id );
+
+	if ( ! $post_id ) {
+		return false;
+	}
+
+	$post = \get_post( $post_id );
+
+	if ( ! $post instanceof \WP_Post ) {
+		debug( "cam_issue_main_article_ca_for_post: post not found, post_id={$post_id}" );
+		return false;
+	}
+
+	if ( 'publish' !== $post->post_status ) {
+		debug( "cam_issue_main_article_ca_for_post: post not publish, post_id={$post_id}" );
+		return false;
+	}
+
+	if ( ! \in_array( $post->post_type, array( 'post', 'page' ), true ) ) {
+		debug( "cam_issue_main_article_ca_for_post: unsupported post_type={$post->post_type}, post_id={$post_id}" );
+		return false;
+	}
+
+	// 既に main記事CA があれば安全のため何もしない
+	if ( cam_has_main_article_ca( $post_id ) ) {
+		debug( "cam_issue_main_article_ca_for_post: skip existing main article ca, post_id={$post_id}" );
+		return true;
+	}
+
+	$admin_secret = \get_option( 'profile_ca_server_admin_secret' );
+	$hostname     = \get_option( 'profile_ca_server_hostname', PROFILE_DEFAULT_CA_SERVER_HOSTNAME );
+	$issuer_id    = \get_option( 'profile_ca_issuer_id' );
+	$endpoint     = "https://{$hostname}/ca";
+
+	if ( ! $admin_secret || ! $issuer_id ) {
+		debug( 'cam_issue_main_article_ca_for_post: missing admin_secret or issuer_id' );
+		return false;
+	}
+
+	if ( defined( 'WP_DEBUG' ) && WP_DEBUG && 'localhost' === $hostname ) {
+		$in_docker = \file_exists( '/.dockerenv' );
+		if ( $in_docker ) {
+			$endpoint = 'http://host.docker.internal:8080/ca';
+		} else {
+			$endpoint = 'http://localhost:8080/ca';
+		}
+	}
+
+	$snapshot = cam_get_article_meta_snapshot( $post_id );
+
+	// 一括入力値を一時適用（CA生成に使う）
+	cam_apply_bulk_article_meta_values( $post_id, $editor_name, $author_name );
+
+	$main_uca = cam_build_main_article_uca_for_post( $post, (string) $issuer_id );
+
+	if ( false === $main_uca ) {
+		cam_restore_article_meta_snapshot( $post_id, $snapshot );
+		debug( "cam_issue_main_article_ca_for_post: failed to build main UCA, post_id={$post_id}" );
+		return false;
+	}
+
+	$cas = issue_ca( $main_uca, $endpoint, (string) $admin_secret );
+
+	if ( false === $cas || empty( $cas ) ) {
+		cam_restore_article_meta_snapshot( $post_id, $snapshot );
+		debug( "cam_issue_main_article_ca_for_post: issue_ca failed, post_id={$post_id}" );
+		return false;
+	}
+
+	$cas_items = \is_array( $cas ) ? $cas : array( $cas );
+	$cas_items = array_values(
+		array_filter(
+			$cas_items,
+			static function ( $item ) {
+				return \is_string( $item ) && '' !== $item;
+			}
+		)
+	);
+
+	if ( empty( $cas_items ) ) {
+		cam_restore_article_meta_snapshot( $post_id, $snapshot );
+		debug( "cam_issue_main_article_ca_for_post: no cas items returned, post_id={$post_id}" );
+		return false;
+	}
+
+	$result = cam_merge_main_article_cas_into_post( $post_id, $cas_items );
+
+	if ( ! $result ) {
+		cam_restore_article_meta_snapshot( $post_id, $snapshot );
+		return false;
+	}
+
+	// 成功後は UI と整合する記事CAメタを残す
+	if ( '' !== \trim( $editor_name ) ) {
+		\update_post_meta( $post_id, '_cam_editor_name', \trim( $editor_name ) );
+	}
+
+	if ( '' !== \trim( $author_name ) ) {
+		\update_post_meta( $post_id, '_cam_author_name', \trim( $author_name ) );
+	}
+
+	\update_post_meta( $post_id, '_cam_article_ca_status', 'success' );
+
+	return true;
+}
+
+/**
+ * 記事CA一括発行ハンドラ
+ *
+ * - main記事CA が無いページだけ対象
+ * - 既存の embedded CA は触らない
+ *
+ * @return void
+ */
+function cam_handle_bulk_issue_article_ca() {
+	if ( ! \current_user_can( 'manage_options' ) ) {
+		\wp_die( 'この操作を実行する権限がありません。' );
+	}
+
+	\check_admin_referer( 'cam_bulk_issue_article_ca_action', 'cam_bulk_issue_article_ca_nonce' );
+
+	$editor_name = isset( $_POST['cam_bulk_editor_name'] )
+		? \sanitize_text_field( \wp_unslash( $_POST['cam_bulk_editor_name'] ) )
+		: '';
+
+	$author_name = isset( $_POST['cam_bulk_author_name'] )
+		? \sanitize_text_field( \wp_unslash( $_POST['cam_bulk_author_name'] ) )
+		: '';
+
+	$post_ids = cam_get_posts_without_main_article_ca();
+
+	$total    = \count( $post_ids );
+	$success  = 0;
+	$skipped  = 0;
+	$failed   = 0;
+	$warnings = 0;
+
+	$failed_items  = array();
+	$warning_items = array();
+
+	debug( "cam_handle_bulk_issue_article_ca start: total={$total}" );
+
+	foreach ( $post_ids as $post_id ) {
+		$post_id = \absint( $post_id );
+
+		$post = \get_post( $post_id );
+		if ( ! $post instanceof \WP_Post ) {
+			$failed++;
+			$failed_items[] = array(
+				'post_id'   => $post_id,
+				'title'     => '(post not found)',
+				'edit_url'  => \admin_url( 'post.php?post=' . $post_id . '&action=edit' ),
+				'view_url'  => '',
+				'reason'    => '投稿が見つからない',
+			);
+			continue;
+		}
+
+		if ( cam_has_main_article_ca( $post_id ) ) {
+			$skipped++;
+			continue;
+		}
+
+		$result = cam_issue_main_article_ca_for_post( $post_id, $editor_name, $author_name );
+
+		if ( $result ) {
+			$success++;
+
+			$warning_reasons = cam_detect_article_ca_warning_reasons( $post );
+
+			if ( ! empty( $warning_reasons ) ) {
+				$warnings++;
+				$warning_items[] = array(
+					'post_id'   => $post_id,
+					'title'     => \get_the_title( $post ),
+					'edit_url'  => \admin_url( 'post.php?post=' . $post_id . '&action=edit' ),
+					'view_url'  => \get_permalink( $post_id ),
+					'reason'    => implode( ' / ', $warning_reasons ),
+				);
+			}
+		} else {
+			$failed++;
+
+			$failed_items[] = array(
+				'post_id'   => $post_id,
+				'title'     => \get_the_title( $post ),
+				'edit_url'  => \admin_url( 'post.php?post=' . $post_id . '&action=edit' ),
+				'view_url'  => \get_permalink( $post_id ),
+				'reason'    => '記事CAの組み立てまたは発行に失敗',
+			);
+		}
+	}
+
+	cam_store_bulk_article_ca_report(
+		array(
+			'failed_items'  => $failed_items,
+			'warning_items' => $warning_items,
+		)
+	);
+
+	debug( "cam_handle_bulk_issue_article_ca done: total={$total}, success={$success}, skipped={$skipped}, failed={$failed}, warnings={$warnings}" );
+
+	$redirect_url = \add_query_arg(
+		array(
+			'page'                => 'ca-manager',
+			'cam_bulk_issue_done' => 1,
+			'total'               => $total,
+			'success'             => $success,
+			'skipped'             => $skipped,
+			'failed'              => $failed,
+			'warnings'            => $warnings,
+		),
+		\admin_url( 'options-general.php' )
+	);
+
+	\wp_safe_redirect( $redirect_url );
+	exit;
+}
+
 /** 投稿への署名処理の初期化 */
 function init() {
 	\add_action( 'transition_post_status', '\Profile\Issue\sign_post', 10, 3 );
 	\add_action( 'save_post', '\Profile\Issue\sign_post_on_save', 20, 3 );
+	\add_action( 'admin_post_cam_bulk_issue_article_ca', '\Profile\Issue\cam_handle_bulk_issue_article_ca' );
 	\add_filter( 'wp_generate_attachment_metadata', '\Profile\Issue\update_attachment_integrity_metadata', 10, 2 );
 	\add_filter( 'the_content', '\Profile\Issue\inject_text_target_ids_into_front_html', 98 );
 	\add_filter( 'the_content', '\Profile\Issue\inject_embedded_image_ids_into_front_html', 99 );
@@ -1287,6 +2201,9 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 		$title_text = $post->post_title;
 		$title_id   = profile_paragraph_id_from_text( $title_text );
 
+		debug( 'MAIN_TITLE_TEXT=' . $title_text );
+		debug( 'MAIN_TITLE_ID=' . $title_id );
+
 		$title_html = '<h1 class="page-title typesquare_option">'
 			. '<span id="' . esc_attr( $title_id ) . '" class=" typesquare_option">'
 			. esc_html( $title_text )
@@ -1416,6 +2333,23 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 				200
 			)
 		);
+
+		debug( 'MAIN_TARGET_COUNT=' . ( is_array( $targets ) ? count( $targets ) : 0 ) );
+
+		if ( is_array( $targets ) ) {
+			foreach ( $targets as $i => $t ) {
+				$type      = $t['type'] ?? '';
+				$selector  = $t['cssSelector'] ?? '';
+				$integrity = $t['integrity'] ?? '';
+
+				debug(
+					'MAIN_TARGET[' . $i . ']'
+					. ' type=' . $type
+					. ', selector=' . $selector
+					. ', integrity=' . ( '' === $integrity ? '(empty)' : $integrity )
+				);
+			}
+		}
 
 		debug( 'create_uca_list before new Uca, page=' . $page );
 
