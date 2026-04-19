@@ -2,17 +2,19 @@
 WordPress用のContent Attestation（CA）発行・検証対応プラグインです。
 本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったものです。
 
-# CA Manager Extension (v0.4.3-1)
+# CA Manager Extension 
 
 CA Manager（v0.4.3）をベースに、
 WordPress上での実運用を想定して拡張した実装です。
 
-最新版は Releases からダウンロードできます。
+最新版は [Releases](https://github.com/yoshid8s/ca-manager-extension/releases) からダウンロードできます。
 
 ## 主な機能
 - 投稿単位でのCA管理
 - 広告CA（OnlineAd）
 - 埋め込みコンテンツCA
+- 記事CAの一括発行機能
+- 複数記事に対するCA発行
 - UIイメージ例（下図）
 
 <img width="1458" height="417" alt="image" src="https://github.com/user-attachments/assets/aa652fb6-77c4-4924-93ba-b69fdb4183b1" />
@@ -39,6 +41,11 @@ CMS環境で実装可能にするためのリファレンス実装です。
 
 バグ修正しました。更新履歴を参照ください。
 
+## Latest update (v0.4.4-1)
+
+- 記事CAの一括発行機能を追加
+- 複数記事に対するCA発行の安定性を改善
+
 ---
 
 ## 主な機能
@@ -48,10 +55,17 @@ CMS環境で実装可能にするためのリファレンス実装です。
 - 広告コンテンツのCA発行
 - WordPress編集画面からCA管理
 - CAS（application/cas+json）の自動埋め込み
+- 記事CAの一括発行機能
+- 複数記事に対するCA発行
 
 ---
 
 ## 更新履歴
+
+### v0.4.4-1（2026-04）
+
+- 記事CAの一括発行機能を追加
+- 複数記事に対するCA発行の安定性を改善
 
 ### v0.4.3-2（2026-04）
 
