@@ -133,7 +133,111 @@ function cam_top_ad_inline_style() {
 			background: #fafafa;
 			text-align: left;
 		}
+		.cam-context-ad-slot {
+			margin: 32px 0;
+		}
+
+		.cam-context-ad-inner {
+			display: block;
+			width: 100%;
+		}
+
+		.cam-context-ad-link,
+		.cam-context-ad-link:hover {
+			display: block;
+			text-decoration: none;
+			border: 0;
+		}
+
+		.cam-context-ad-image {
+			display: block;
+			max-width: 100%;
+			height: auto;
+		}
+
+		.cam-context-ad-text {
+			padding: 16px;
+			border: 1px solid #ddd;
+			background: #fafafa;
+		}
 	</style>
 	<?php
 }
 add_action( 'wp_head', 'cam_top_ad_inline_style' );
+
+/**
+ * コンテキスト広告（placement別）HTML生成
+ *
+ * @param int    $post_id
+ * @param string $placement top / middle / bottom
+ * @return string
+ */
+function cam_get_context_ad_html( $post_id, $placement = 'top' ) {
+
+	$ad = cam_get_context_ad_for_post_and_placement( $post_id, $placement );
+
+	if ( ! is_array( $ad ) || empty( $ad ) ) {
+		return '';
+	}
+
+	// 有効チェック
+	if ( empty( $ad['enabled'] ) || 'active' !== $ad['status'] ) {
+		return '';
+	}
+
+	$id = 'cam-context-ad-' . $placement . '-' . $post_id;
+
+	$headline    = $ad['headline'];
+	$image       = $ad['image'];
+	$destination = $ad['destination'];
+	$advertiser  = $ad['advertiser'];
+
+	$label = $headline;
+	if ( '' === $label ) {
+		$label = $advertiser ? $advertiser : 'Advertisement';
+	}
+
+	$html  = '<div class="cam-context-ad-slot cam-context-ad-' . esc_attr( $placement ) . '" data-cam-placement="' . esc_attr( $placement ) . '">';
+	$html .= '<div class="cam-context-ad-inner">';
+
+	// 画像優先
+	if ( '' !== $image ) {
+		$image_html = '<img id="' . esc_attr( $id ) . '" src="' . esc_url( $image ) . '" alt="' . esc_attr( $label ) . '" class="cam-context-ad-image">';
+
+		if ( '' !== $destination ) {
+			$html .= '<a href="' . esc_url( $destination ) . '" class="cam-context-ad-link">';
+			$html .= $image_html;
+			$html .= '</a>';
+		} else {
+			$html .= $image_html;
+		}
+	} else {
+		// テキスト fallback
+		$html .= '<div id="' . esc_attr( $id ) . '" class="cam-context-ad-text">';
+		$html .= esc_html( $label );
+		$html .= '</div>';
+	}
+
+	$html .= '</div>';
+	$html .= '</div>';
+
+	return $html;
+}
+
+function cam_context_ad_top_shortcode() {
+	if ( is_admin() ) return '';
+	return cam_get_context_ad_html( get_the_ID(), 'top' );
+}
+add_shortcode( 'cam_context_ad_top', 'cam_context_ad_top_shortcode' );
+
+function cam_context_ad_middle_shortcode() {
+	if ( is_admin() ) return '';
+	return cam_get_context_ad_html( get_the_ID(), 'middle' );
+}
+add_shortcode( 'cam_context_ad_middle', 'cam_context_ad_middle_shortcode' );
+
+function cam_context_ad_bottom_shortcode() {
+	if ( is_admin() ) return '';
+	return cam_get_context_ad_html( get_the_ID(), 'bottom' );
+}
+add_shortcode( 'cam_context_ad_bottom', 'cam_context_ad_bottom_shortcode' );

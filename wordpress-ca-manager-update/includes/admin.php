@@ -92,6 +92,7 @@ function register_settings() {
 	\add_settings_field( 'profile_ca_target_html', '検証対象要素の存在するHTML', '\Profile\Admin\profile_ca_target_html_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_embedded_or_external', 'CA Presentation Type', '\Profile\Admin\profile_ca_embedded_or_external_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_log_option', 'ログの出力設定', '\Profile\Admin\profile_ca_log_option_field', 'ca-manager', 'profile_settings' );
+	\register_setting( 'ca-manager', 'cam_context_ads' );
 }
 
 /** 設定画面 */
@@ -186,6 +187,9 @@ function settings_page() {
 		<form method="post" action="options.php">
 			<?php \settings_fields( 'ca-manager' ); ?>
 			<?php \do_settings_sections( 'ca-manager' ); ?>
+
+			<?php cam_context_ads_settings_block(); ?>
+
 			<?php \submit_button(); ?>
 		</form>
 
@@ -441,6 +445,163 @@ function profile_ca_log_option_field() {
 		}
 		?>
 	</p>
+	<?php
+}
+
+function cam_context_ads_settings_block() {
+	$ads = \get_option( 'cam_context_ads', array() );
+
+	$item = array(
+		'enabled'             => '',
+		'status'              => 'inactive',
+		'genre'               => '',
+		'advertiser'          => '',
+
+		'top_headline'        => '',
+		'top_image'           => '',
+		'top_destination'     => '',
+
+		'middle_headline'     => '',
+		'middle_image'        => '',
+		'middle_destination'  => '',
+
+		'bottom_headline'     => '',
+		'bottom_image'        => '',
+		'bottom_destination'  => '',
+	);
+
+	if ( \is_array( $ads ) && ! empty( $ads[0] ) ) {
+		$item = array_merge( $item, $ads[0] );
+	}
+	?>
+	<h2>コンテキスト広告設定</h2>
+	<p>genre に一致した記事に対して、上・中・下の3段階で広告を表示します。</p>
+
+	<table class="form-table" role="presentation">
+		<tbody>
+			<tr>
+				<th scope="row"><label for="cam_context_enabled">有効化</label></th>
+				<td>
+					<input type="checkbox" id="cam_context_enabled" name="cam_context_ads[0][enabled]" value="1" <?php \checked( ! empty( $item['enabled'] ) ); ?>>
+					genre一致時に広告を表示
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row"><label for="cam_context_status">状態</label></th>
+				<td>
+					<select id="cam_context_status" name="cam_context_ads[0][status]">
+						<option value="active" <?php \selected( $item['status'], 'active' ); ?>>active</option>
+						<option value="inactive" <?php \selected( $item['status'], 'inactive' ); ?>>inactive</option>
+					</select>
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row"><label for="cam_context_genre">genre</label></th>
+				<td>
+					<select id="cam_context_genre" name="cam_context_ads[0][genre]">
+						<option value="">未設定</option>
+						<option value="fashion" <?php \selected( $item['genre'], 'fashion' ); ?>>fashion</option>
+						<option value="travel" <?php \selected( $item['genre'], 'travel' ); ?>>travel</option>
+						<option value="car" <?php \selected( $item['genre'], 'car' ); ?>>car</option>
+						<option value="culture" <?php \selected( $item['genre'], 'culture' ); ?>>culture</option>
+					</select>
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row"><label for="cam_context_advertiser">広告主</label></th>
+				<td>
+					<input type="text" id="cam_context_advertiser" name="cam_context_ads[0][advertiser]" value="<?php echo \esc_attr( $item['advertiser'] ); ?>" class="regular-text">
+				</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<hr>
+
+	<h3>上段広告（ブランド認知）</h3>
+	<p>タイトル下などに表示する想定です。まずはロゴやブランド名訴求に使います。</p>
+	<table class="form-table" role="presentation">
+		<tbody>
+			<tr>
+				<th scope="row"><label for="cam_context_top_headline">見出し</label></th>
+				<td>
+					<input type="text" id="cam_context_top_headline" name="cam_context_ads[0][top_headline]" value="<?php echo \esc_attr( $item['top_headline'] ); ?>" class="regular-text">
+					<p class="description">例：KITON</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="cam_context_top_image">画像URL</label></th>
+				<td>
+					<input type="url" id="cam_context_top_image" name="cam_context_ads[0][top_image]" value="<?php echo \esc_attr( $item['top_image'] ); ?>" class="regular-text">
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="cam_context_top_destination">遷移先URL</label></th>
+				<td>
+					<input type="url" id="cam_context_top_destination" name="cam_context_ads[0][top_destination]" value="<?php echo \esc_attr( $item['top_destination'] ); ?>" class="regular-text">
+				</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<hr>
+
+	<h3>中段広告（キーメッセージ）</h3>
+	<p>記事の途中で、ブランドの価値や主メッセージを伝える想定です。</p>
+	<table class="form-table" role="presentation">
+		<tbody>
+			<tr>
+				<th scope="row"><label for="cam_context_middle_headline">見出し</label></th>
+				<td>
+					<input type="text" id="cam_context_middle_headline" name="cam_context_ads[0][middle_headline]" value="<?php echo \esc_attr( $item['middle_headline'] ); ?>" class="regular-text">
+					<p class="description">例：KITON、あなたのエレガントさを引き立てるスーツ</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="cam_context_middle_image">画像URL</label></th>
+				<td>
+					<input type="url" id="cam_context_middle_image" name="cam_context_ads[0][middle_image]" value="<?php echo \esc_attr( $item['middle_image'] ); ?>" class="regular-text">
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="cam_context_middle_destination">遷移先URL</label></th>
+				<td>
+					<input type="url" id="cam_context_middle_destination" name="cam_context_ads[0][middle_destination]" value="<?php echo \esc_attr( $item['middle_destination'] ); ?>" class="regular-text">
+				</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<hr>
+
+	<h3>下段広告（クロージング）</h3>
+	<p>記事末尾で、来店・訪問・購入などのクロージングを促す想定です。</p>
+	<table class="form-table" role="presentation">
+		<tbody>
+			<tr>
+				<th scope="row"><label for="cam_context_bottom_headline">見出し</label></th>
+				<td>
+					<input type="text" id="cam_context_bottom_headline" name="cam_context_ads[0][bottom_headline]" value="<?php echo \esc_attr( $item['bottom_headline'] ); ?>" class="regular-text">
+					<p class="description">例：KITONストアでお待ちしています。</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="cam_context_bottom_image">画像URL</label></th>
+				<td>
+					<input type="url" id="cam_context_bottom_image" name="cam_context_ads[0][bottom_image]" value="<?php echo \esc_attr( $item['bottom_image'] ); ?>" class="regular-text">
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="cam_context_bottom_destination">遷移先URL</label></th>
+				<td>
+					<input type="url" id="cam_context_bottom_destination" name="cam_context_ads[0][bottom_destination]" value="<?php echo \esc_attr( $item['bottom_destination'] ); ?>" class="regular-text">
+				</td>
+			</tr>
+		</tbody>
+	</table>
 	<?php
 }
 
