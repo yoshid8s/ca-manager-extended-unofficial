@@ -30,14 +30,14 @@ WordPress上での実運用を想定して拡張した実装です。
 - 記事CAの一括発行機能
 - 複数記事に対するCA発行
 - UIイメージ例（下図）
-<br>
-全体の管理画面
-<br>
+
+## 管理画面（設定・一括発行）
+
 <img width="536" height="542" alt="image" src="https://github.com/user-attachments/assets/eb99ffdf-da5d-4062-b24b-3422214bd418" />
-<br>
-編集画面例
+
+## 編集画面例（個別CA管理）
+
 <img width="1458" height="417" alt="image" src="https://github.com/user-attachments/assets/aa652fb6-77c4-4924-93ba-b69fdb4183b1" />
-<br>
 
 ## 位置付け
 本実装は、OPにおける「個別セレクター単位でのCA発行」という前提を、
