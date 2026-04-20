@@ -10,13 +10,22 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return string
  */
 function cam_get_top_ad_html( $post_id ) {
-	$ad_items = get_post_meta( $post_id, '_cam_ad_items', true );
+	$ad = null;
 
-	if ( ! is_array( $ad_items ) || empty( $ad_items[0] ) ) {
-		return '';
+	// まず投稿個別の広告設定を優先
+	$ad_items = get_post_meta( $post_id, '_cam_ad_items', true );
+	if ( is_array( $ad_items ) && ! empty( $ad_items[0] ) ) {
+		$ad = $ad_items[0];
 	}
 
-	$ad = $ad_items[0];
+	// 個別広告が無ければ genre一致のコンテキスト広告を使う
+	if ( ! is_array( $ad ) || empty( $ad ) ) {
+		$ad = cam_get_context_ad_for_post( $post_id );
+	}
+
+	if ( ! is_array( $ad ) || empty( $ad ) ) {
+		return '';
+	}
 
 	$enabled     = ! empty( $ad['enabled'] );
 	$status      = isset( $ad['status'] ) ? (string) $ad['status'] : 'unset';
@@ -28,8 +37,13 @@ function cam_get_top_ad_html( $post_id ) {
 	$ad_code     = isset( $ad['ad_code'] ) ? (string) $ad['ad_code'] : '';
 
 	// まずは enabled と active の両方を条件にする
-	if ( ! $enabled || 'active' !== $status || '' === $id ) {
+	if ( ! $enabled || 'active' !== $status ) {
 		return '';
+	}
+
+	// id が無い場合はコンテキスト広告用に自動付与
+	if ( '' === $id ) {
+		$id = 'cam-context-ad-' . $post_id;
 	}
 
 	$label = $headline;
@@ -37,8 +51,8 @@ function cam_get_top_ad_html( $post_id ) {
 		$label = $advertiser ? $advertiser : 'Advertisement';
 	}
 
-    $html  = '<div class="cam-top-ad-slot" data-cam-placement="top_under_title">';
-    $html .= '<div class="cam-top-ad-inner">';
+	$html  = '<div class="cam-top-ad-slot" data-cam-placement="top_under_title">';
+	$html .= '<div class="cam-top-ad-inner">';
 
 	// まずは画像広告優先
 	if ( '' !== $image ) {
@@ -52,7 +66,6 @@ function cam_get_top_ad_html( $post_id ) {
 			$html .= $image_html;
 		}
 	} elseif ( '' !== $ad_code ) {
-		// 将来のGoogle Adsコード用
 		$html .= $ad_code;
 	} else {
 		$html .= '<div class="cam-top-ad-placeholder">' . esc_html( $label ) . '</div>';

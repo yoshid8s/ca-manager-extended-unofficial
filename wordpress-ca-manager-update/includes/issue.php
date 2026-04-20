@@ -2567,6 +2567,95 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 				}
 			}
 		}
+
+		// ▼ コンテキスト広告CA追加
+		$has_post_specific_ad = false;
+
+		if ( \is_array( $ad_items ) && ! empty( $ad_items[0] ) ) {
+			$existing_ad_item = $ad_items[0];
+
+			$existing_enabled = ! empty( $existing_ad_item['enabled'] );
+			$existing_status  = isset( $existing_ad_item['status'] ) ? (string) $existing_ad_item['status'] : 'unset';
+
+			if ( $existing_enabled && 'active' === $existing_status ) {
+				$has_post_specific_ad = true;
+			}
+		}
+
+		// 投稿個別広告が無いときだけ、genre一致のコンテキスト広告を広告CA化
+		if ( ! $has_post_specific_ad ) {
+			$context_ad = \cam_get_context_ad_for_post( $post->ID );
+
+			if ( \is_array( $context_ad ) && ! empty( $context_ad ) ) {
+				$context_enabled     = ! empty( $context_ad['enabled'] );
+				$context_status      = isset( $context_ad['status'] ) ? (string) $context_ad['status'] : 'inactive';
+				$context_headline    = isset( $context_ad['headline'] ) ? (string) $context_ad['headline'] : '';
+				$context_advertiser  = isset( $context_ad['advertiser'] ) ? (string) $context_ad['advertiser'] : '';
+				$context_destination = isset( $context_ad['destination'] ) ? (string) $context_ad['destination'] : '';
+				$context_image       = isset( $context_ad['image'] ) ? (string) $context_ad['image'] : '';
+
+				if ( $context_enabled && 'active' === $context_status ) {
+					$context_ad_id       = 'cam-context-ad-' . $post->ID;
+					$context_ad_selector = '#' . $context_ad_id;
+					$context_ad_html     = '';
+					$context_target_html = '';
+
+					// 表示側と同じHTMLを使う
+					if ( \function_exists( '\cam_get_top_ad_html' ) ) {
+						$context_ad_html = \cam_get_top_ad_html( $post->ID );
+					}
+
+					if ( '' !== $context_ad_html ) {
+						$context_target_html = extract_target_html_by_selector( $context_ad_html, $context_ad_selector );
+					}
+
+					$context_target_integrity = null;
+
+					// imgタグの integrity 属性があればそれを使う
+					if ( '' !== $context_target_html ) {
+						$raw_integrities = external_resources_from_html( $context_target_html, '//img[@integrity]' );
+
+						if ( ! empty( $raw_integrities ) && is_string( $raw_integrities[0] ) ) {
+							$context_target_integrity = trim( preg_replace( '/\s+/', ' ', $raw_integrities[0] ) );
+							debug( 'context ad full integrity from html=' . $context_target_integrity );
+						}
+					}
+
+					// 無ければ画像URLから attachment integrity を拾う
+					if ( ( null === $context_target_integrity || '' === $context_target_integrity ) && '' !== $context_image ) {
+						$context_target_integrity = find_attachment_all_integrities_by_image_url( $context_image );
+						debug( 'context ad fallback all integrities from attachment=' . ( $context_target_integrity ?: '(null)' ) );
+					}
+
+					if ( '' !== $context_target_html && null !== $context_target_integrity && '' !== $context_target_integrity ) {
+						$context_ad_uca = new Uca(
+							issuer: $issuer_id,
+							url: $permalink,
+							locale: $locale,
+							html: $context_target_html,
+							target_type: 'ExternalResourceTargetIntegrity',
+							target_css_selector: $context_ad_selector,
+							external_resources: array(),
+							headline: $context_headline ?: ( $context_advertiser ?: 'Advertisement' ),
+							description: 'Context Ad',
+							image: '' !== $context_image ? $context_image : null,
+							author: '' !== $context_advertiser ? $context_advertiser : null,
+							date_published: null,
+							date_modified: null,
+							subject_type: 'OnlineAd',
+							target_integrity: $context_target_integrity,
+						);
+
+						\array_push( $uca_list, $context_ad_uca );
+						debug( 'create_uca_list after push context ad uca, selector=' . $context_ad_selector . ', integrity=' . $context_target_integrity );
+					} else {
+						debug( 'create_uca_list context ad target html or integrity missing, selector=' . $context_ad_selector );
+					}
+				}
+			}
+		}
+		// ▲ コンテキスト広告CA追加
+
 	}
 
 	debug( 'create_uca_list end, total=' . count( $uca_list ) );
