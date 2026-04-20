@@ -4,7 +4,7 @@
  *
  * Plugin Name: CA Manager (Originator Profile)
  * Description: WordPress での記事公開時の Content Attestation (CA) 発行を支援するプラグインです。投稿編集画面で記事CA・広告CA・埋め込みコンテンツCAを一元管理できます。本バージョンでの広告CAおよび埋め込みコンテンツCAは、発信者による自己申告に基づくものであり、第三者コンテンツの真正性を保証するものではありません。
- * Version: 0.4.3-1
+ * Version: 0.4.5-beta1
  * Author: Originator Profile Collaborative Innovation Partnership
  * Author URI: https://originator-profile.org/
  * License: MIT
