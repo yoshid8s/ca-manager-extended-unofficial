@@ -2,6 +2,20 @@
 WordPress用のContent Attestation（CA）発行・検証対応プラグインです。
 本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったものです。
 
+## Compatibility
+
+本プラグインは、従来型（クラシック）テーマを前提として実装されています。
+
+動作確認済み：
+- Chic
+- Twenty Eleven
+
+未対応・検証未実施：
+- ドラッグ＆ドロップ型の専用ビルダー（例：Colibri など）
+
+これらのビルダー環境では、DOM構造の違いにより正常に動作しない可能性があり、
+今後の対応が必要です。
+
 # CA Manager Extension 
 
 CA Manager（v0.4.3）をベースに、
