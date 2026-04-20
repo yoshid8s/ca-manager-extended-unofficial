@@ -346,6 +346,19 @@ function camui_render_ca_meta_box( $post ) {
 							<th scope="row"><label for="cam_author_name">執筆者</label></th>
 							<td><input type="text" id="cam_author_name" name="cam_author_name" value="<?php echo esc_attr( $author_name ); ?>" class="regular-text" /></td>
 						</tr>
+						<tr>
+							<th scope="row"><label for="cam_genre">ジャンル</label></th>
+							<td>
+								<?php $genre = get_post_meta( $post->ID, '_cam_genre', true ); ?>
+								<select name="cam_genre" id="cam_genre">
+									<option value="">未設定</option>
+									<option value="fashion" <?php selected( $genre, 'fashion' ); ?>>fashion</option>
+									<option value="travel" <?php selected( $genre, 'travel' ); ?>>travel</option>
+									<option value="car" <?php selected( $genre, 'car' ); ?>>car</option>
+									<option value="culture" <?php selected( $genre, 'culture' ); ?>>culture</option>
+								</select>
+							</td>
+						</tr>
 					</tbody>
 				</table>
 			</div>
@@ -685,6 +698,15 @@ function camui_save_ca_meta_box( $post_id ) {
 		}
 
 		update_post_meta( $post_id, $meta_key, $value );
+	}
+
+	// genre 保存
+	if ( isset( $_POST['cam_genre'] ) ) {
+		update_post_meta(
+			$post_id,
+			'_cam_genre',
+			sanitize_text_field( wp_unslash( $_POST['cam_genre'] ) )
+		);
 	}
 
     /*

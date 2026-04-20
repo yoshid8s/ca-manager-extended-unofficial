@@ -2388,6 +2388,7 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 			author: $author_name,
 			date_published: \get_the_date( \DateTimeInterface::RFC3339, $post ),
 			date_modified: \get_the_modified_date( \DateTimeInterface::RFC3339, $post ),
+			genre: \get_post_meta( $post->ID, '_cam_genre', true ),
 		);
 
 		debug( 'create_uca_list after new Uca, page=' . $page );

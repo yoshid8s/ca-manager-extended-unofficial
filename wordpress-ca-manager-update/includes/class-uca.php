@@ -45,8 +45,9 @@ final class Uca {
 		public ?string $author = null,
 		public ?string $date_published = null,
 		public ?string $date_modified = null,
+		public ?string $genre = null,
 		public string $subject_type = 'Article',
-		public ?string $target_integrity = null,
+		public ?string $target_integrity = null,	
 	) {}
 
 
@@ -155,6 +156,7 @@ final class Uca {
 			'type'          => $this->subject_type,
 			'headline'      => $is_ad ? null : $this->headline,
 			'name'          => $is_ad ? $this->headline : ( 'Image' === $this->subject_type ? $this->headline : null ),
+			'genre'         => $is_ad ? null : $this->genre,
 			'image'         => $this->image ? array( 'id' => $this->image ) : null,
 			'description'   => $this->description,
 			'author'        => $this->author ? array( $this->author ) : null,
