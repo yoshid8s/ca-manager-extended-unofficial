@@ -191,7 +191,19 @@ function cam_get_context_ad_html( $post_id, $placement = 'top' ) {
 	$image       = $ad['image'];
 	$destination = $ad['destination'];
 	$advertiser  = $ad['advertiser'];
+	$ad_id       = isset( $ad['id'] ) ? (string) $ad['id'] : '';
+	$genre       = isset( $ad['genre'] ) ? (string) $ad['genre'] : '';
 
+	$tracked_destination = '';
+
+	if ( '' !== $destination && '' !== $ad_id ) {
+		$tracked_destination = cam_get_context_ad_click_url(
+			$ad_id,
+			$placement,
+			$post_id,
+			$genre
+		);
+	}
 	$label = $headline;
 	if ( '' === $label ) {
 		$label = $advertiser ? $advertiser : 'Advertisement';
@@ -200,26 +212,67 @@ function cam_get_context_ad_html( $post_id, $placement = 'top' ) {
 	$html  = '<div class="cam-context-ad-slot cam-context-ad-' . esc_attr( $placement ) . '" data-cam-placement="' . esc_attr( $placement ) . '">';
 	$html .= '<div class="cam-context-ad-inner">';
 
+
 	// 画像優先
 	if ( '' !== $image ) {
 		$image_html = '<img id="' . esc_attr( $id ) . '" src="' . esc_url( $image ) . '" alt="' . esc_attr( $label ) . '" class="cam-context-ad-image">';
 
-		if ( '' !== $destination ) {
-			$html .= '<a href="' . esc_url( $destination ) . '" class="cam-context-ad-link">';
-			$html .= $image_html;
+	if ( '' !== $tracked_destination ) {
+		$html .= '<a href="' . esc_url( $tracked_destination ) . '" class="cam-context-ad-link">';
+		$html .= $image_html;
+		$html .= '</a>';
+	} else {
+		$html .= $image_html;
+	}
+	} else {
+		$text_html  = '<div id="' . esc_attr( $id ) . '" class="cam-context-ad-text">';
+		$text_html .= esc_html( $label );
+		$text_html .= '</div>';
+
+		if ( '' !== $tracked_destination ) {
+			$html .= '<a href="' . esc_url( $tracked_destination ) . '" class="cam-context-ad-link">';
+			$html .= $text_html;
 			$html .= '</a>';
 		} else {
-			$html .= $image_html;
+			$html .= $text_html;
 		}
-	} else {
-		// テキスト fallback
-		$html .= '<div id="' . esc_attr( $id ) . '" class="cam-context-ad-text">';
-		$html .= esc_html( $label );
-		$html .= '</div>';
 	}
 
 	$html .= '</div>';
 	$html .= '</div>';
+
+	if ( 'bottom' === $placement && '' !== $ad_id ) {
+		$html .= '<span'
+			. ' class="cam-context-bottom-reach-marker"'
+			. ' data-ad-id="' . esc_attr( $ad_id ) . '"'
+			. ' data-post-id="' . esc_attr( $post_id ) . '"'
+			. ' data-genre="' . esc_attr( $genre ) . '"'
+			. ' aria-hidden="true"'
+			. ' style="display:block;width:1px;height:1px;"'
+			. '></span>';
+	}
+
+	if ( 'bottom' === $placement && '' !== $ad_id ) {
+		$html .= '<span'
+			. ' class="cam-context-time-marker"'
+			. ' data-ad-id="' . esc_attr( $ad_id ) . '"'
+			. ' data-post-id="' . esc_attr( $post_id ) . '"'
+			. ' data-genre="' . esc_attr( $genre ) . '"'
+			. ' aria-hidden="true"'
+			. ' style="display:block;width:1px;height:1px;"'
+			. '></span>';
+	}
+
+	if ( '' !== $ad_id ) {
+		cam_log_context_ad_impression(
+			array(
+				'ad_id'     => $ad_id,
+				'placement' => $placement,
+				'post_id'   => $post_id,
+				'genre'     => $genre,
+			)
+		);
+	}
 
 	return $html;
 }
@@ -241,3 +294,117 @@ function cam_context_ad_bottom_shortcode() {
 	return cam_get_context_ad_html( get_the_ID(), 'bottom' );
 }
 add_shortcode( 'cam_context_ad_bottom', 'cam_context_ad_bottom_shortcode' );
+
+/**
+ * bottom 到達ログ用スクリプト
+ */
+function cam_context_ad_bottom_reach_script() {
+	if ( is_admin() || ! is_singular( array( 'post', 'page' ) ) ) {
+		return;
+	}
+	?>
+	<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		var markers = document.querySelectorAll('.cam-context-bottom-reach-marker');
+		if (!markers.length || !('IntersectionObserver' in window)) {
+			return;
+		}
+
+		markers.forEach(function (marker) {
+			var logged = false;
+
+			var observer = new IntersectionObserver(function (entries) {
+				entries.forEach(function (entry) {
+					if (logged) {
+						return;
+					}
+
+					if (entry.isIntersecting) {
+						logged = true;
+
+						var formData = new FormData();
+						formData.append('action', 'cam_log_context_ad_bottom_reach');
+						formData.append('ad_id', marker.getAttribute('data-ad-id') || '');
+						formData.append('post_id', marker.getAttribute('data-post-id') || '');
+						formData.append('genre', marker.getAttribute('data-genre') || '');
+
+						fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+							method: 'POST',
+							credentials: 'same-origin',
+							body: formData
+						}).catch(function () {});
+
+						observer.unobserve(marker);
+					}
+				});
+			}, {
+				root: null,
+				rootMargin: '0px',
+				threshold: 0.2
+			});
+
+			observer.observe(marker);
+		});
+	});
+	</script>
+	<?php
+}
+add_action( 'wp_footer', 'cam_context_ad_bottom_reach_script' );
+
+/**
+ * 滞在秒数ログ用スクリプト
+ */
+function cam_context_ad_time_reach_script() {
+	if ( is_admin() || ! is_singular( array( 'post', 'page' ) ) ) {
+		return;
+	}
+	?>
+	<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		var markers = document.querySelectorAll('.cam-context-time-marker');
+		if (!markers.length) {
+			return;
+		}
+
+		markers.forEach(function (marker) {
+			var adId = marker.getAttribute('data-ad-id') || '';
+			var postId = marker.getAttribute('data-post-id') || '';
+			var genre = marker.getAttribute('data-genre') || '';
+
+			if (!adId) {
+				return;
+			}
+
+			var fired = {
+				10: false,
+				30: false,
+				60: false
+			};
+
+			[10, 30, 60].forEach(function (seconds) {
+				window.setTimeout(function () {
+					if (fired[seconds]) {
+						return;
+					}
+					fired[seconds] = true;
+
+					var formData = new FormData();
+					formData.append('action', 'cam_log_context_ad_time_reach');
+					formData.append('ad_id', adId);
+					formData.append('post_id', postId);
+					formData.append('genre', genre);
+					formData.append('seconds', String(seconds));
+
+					fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+						method: 'POST',
+						credentials: 'same-origin',
+						body: formData
+					}).catch(function () {});
+				}, seconds * 1000);
+			});
+		});
+	});
+	</script>
+	<?php
+}
+add_action( 'wp_footer', 'cam_context_ad_time_reach_script' );

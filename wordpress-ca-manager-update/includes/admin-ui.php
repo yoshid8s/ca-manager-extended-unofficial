@@ -352,10 +352,16 @@ function camui_render_ca_meta_box( $post ) {
 								<?php $genre = get_post_meta( $post->ID, '_cam_genre', true ); ?>
 								<select name="cam_genre" id="cam_genre">
 									<option value="">未設定</option>
-									<option value="fashion" <?php selected( $genre, 'fashion' ); ?>>fashion</option>
-									<option value="travel" <?php selected( $genre, 'travel' ); ?>>travel</option>
-									<option value="car" <?php selected( $genre, 'car' ); ?>>car</option>
-									<option value="culture" <?php selected( $genre, 'culture' ); ?>>culture</option>
+
+									<option value="suit" <?php selected( $genre, 'suit' ); ?>>fashion / suit</option>
+									<option value="casual" <?php selected( $genre, 'casual' ); ?>>fashion / casual</option>
+									<option value="vintage" <?php selected( $genre, 'vintage' ); ?>>fashion / vintage</option>
+
+									<option value="japan" <?php selected( $genre, 'japan' ); ?>>travel / japan</option>
+									<option value="international" <?php selected( $genre, 'international' ); ?>>travel / international</option>
+
+									<option value="book" <?php selected( $genre, 'book' ); ?>>culture / book</option>
+									<option value="movie" <?php selected( $genre, 'movie' ); ?>>culture / movie</option>
 								</select>
 							</td>
 						</tr>

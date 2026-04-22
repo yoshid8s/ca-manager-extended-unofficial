@@ -47,7 +47,8 @@ final class Uca {
 		public ?string $date_modified = null,
 		public ?string $genre = null,
 		public string $subject_type = 'Article',
-		public ?string $target_integrity = null,	
+		public ?string $target_integrity = null,
+		public ?string $landing_page_url = null,	
 	) {}
 
 
@@ -162,6 +163,7 @@ final class Uca {
 			'author'        => $this->author ? array( $this->author ) : null,
 			'datePublished' => $this->date_published,
 			'dateModified'  => $this->date_modified,
+			'landingPageUrl' => ( 'OnlineAd' === $this->subject_type && $this->landing_page_url ) ? $this->landing_page_url : null,
 		),
 		'allowedUrl'        => $this->url,
 		'target'            => array_merge(

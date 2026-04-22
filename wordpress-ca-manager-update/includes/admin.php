@@ -187,11 +187,10 @@ function settings_page() {
 		<form method="post" action="options.php">
 			<?php \settings_fields( 'ca-manager' ); ?>
 			<?php \do_settings_sections( 'ca-manager' ); ?>
-
-			<?php cam_context_ads_settings_block(); ?>
-
 			<?php \submit_button(); ?>
 		</form>
+
+		<?php cam_context_ads_settings_block(); ?>
 
 		<hr style="margin: 32px 0;">
 
@@ -448,160 +447,434 @@ function profile_ca_log_option_field() {
 	<?php
 }
 
-function cam_context_ads_settings_block() {
+/**
+ * コンテキスト広告の保存
+ */
+function cam_handle_save_context_ad() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'Unauthorized' );
+	}
+
+	check_admin_referer( 'cam_save_context_ad' );
+
 	$ads = \get_option( 'cam_context_ads', array() );
+	if ( ! \is_array( $ads ) ) {
+		$ads = array();
+	}
 
-	$item = array(
-		'enabled'             => '',
-		'status'              => 'inactive',
-		'genre'               => '',
-		'advertiser'          => '',
+	$ad = array(
+		'id'                 => isset( $_POST['cam_context_id'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_id'] ) ) : '',
+		'enabled'            => ! empty( $_POST['cam_context_enabled'] ) ? 1 : 0,
+		'status'             => isset( $_POST['cam_context_status'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_status'] ) ) : 'inactive',
+		'genre'              => isset( $_POST['cam_context_genre'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_genre'] ) ) : '',
+		'advertiser'         => isset( $_POST['cam_context_advertiser'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_advertiser'] ) ) : '',
 
-		'top_headline'        => '',
-		'top_image'           => '',
-		'top_destination'     => '',
+		'start_date'         => isset( $_POST['cam_context_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_start_date'] ) ) : '',
+		'end_date'           => isset( $_POST['cam_context_end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_end_date'] ) ) : '',
 
-		'middle_headline'     => '',
-		'middle_image'        => '',
-		'middle_destination'  => '',
+		'top_headline'       => isset( $_POST['cam_context_top_headline'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_top_headline'] ) ) : '',
+		'top_image'          => isset( $_POST['cam_context_top_image'] ) ? esc_url_raw( wp_unslash( $_POST['cam_context_top_image'] ) ) : '',
+		'top_destination'    => isset( $_POST['cam_context_top_destination'] ) ? esc_url_raw( wp_unslash( $_POST['cam_context_top_destination'] ) ) : '',
 
-		'bottom_headline'     => '',
-		'bottom_image'        => '',
-		'bottom_destination'  => '',
+		'middle_headline'    => isset( $_POST['cam_context_middle_headline'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_middle_headline'] ) ) : '',
+		'middle_image'       => isset( $_POST['cam_context_middle_image'] ) ? esc_url_raw( wp_unslash( $_POST['cam_context_middle_image'] ) ) : '',
+		'middle_destination' => isset( $_POST['cam_context_middle_destination'] ) ? esc_url_raw( wp_unslash( $_POST['cam_context_middle_destination'] ) ) : '',
+
+		'bottom_headline'    => isset( $_POST['cam_context_bottom_headline'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_bottom_headline'] ) ) : '',
+		'bottom_image'       => isset( $_POST['cam_context_bottom_image'] ) ? esc_url_raw( wp_unslash( $_POST['cam_context_bottom_image'] ) ) : '',
+		'bottom_destination' => isset( $_POST['cam_context_bottom_destination'] ) ? esc_url_raw( wp_unslash( $_POST['cam_context_bottom_destination'] ) ) : '',
 	);
 
-	if ( \is_array( $ads ) && ! empty( $ads[0] ) ) {
-		$item = array_merge( $item, $ads[0] );
+	if ( '' === $ad['id'] ) {
+		$ad['id'] = 'cam-context-' . wp_generate_password( 8, false, false );
+	}
+
+	$updated = false;
+
+	foreach ( $ads as $index => $existing ) {
+		$existing_id = isset( $existing['id'] ) ? (string) $existing['id'] : '';
+		if ( '' !== $existing_id && $existing_id === $ad['id'] ) {
+			$ads[ $index ] = $ad;
+			$updated = true;
+			break;
+		}
+	}
+
+	if ( ! $updated ) {
+		$ads[] = $ad;
+	}
+
+	\update_option( 'cam_context_ads', array_values( $ads ) );
+
+	$redirect_url = add_query_arg(
+		array(
+			'page' => 'ca-manager',
+			'tab'  => 'context_ads',
+			'cam_context_saved' => '1',
+		),
+		admin_url( 'options-general.php' )
+	);
+
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+add_action( 'admin_post_cam_save_context_ad', __NAMESPACE__ . '\\cam_handle_save_context_ad' );
+
+/**
+ * コンテキスト広告の削除
+ */
+function cam_handle_delete_context_ad() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'Unauthorized' );
+	}
+
+	check_admin_referer( 'cam_delete_context_ad' );
+
+	$delete_id = isset( $_POST['cam_context_id'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_id'] ) ) : '';
+
+	$ads = \get_option( 'cam_context_ads', array() );
+	if ( ! \is_array( $ads ) ) {
+		$ads = array();
+	}
+
+	$filtered = array();
+
+	foreach ( $ads as $ad ) {
+		$ad_id = isset( $ad['id'] ) ? (string) $ad['id'] : '';
+
+		if ( '' !== $ad_id && $ad_id === $delete_id ) {
+			continue;
+		}
+		$filtered[] = $ad;
+	}
+
+	\update_option( 'cam_context_ads', array_values( $filtered ) );
+
+	$redirect_url = add_query_arg(
+		array(
+			'page' => 'ca-manager',
+			'tab'  => 'context_ads',
+			'cam_context_deleted' => '1',
+		),
+		admin_url( 'options-general.php' )
+	);
+
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+add_action( 'admin_post_cam_delete_context_ad', __NAMESPACE__ . '\\cam_handle_delete_context_ad' );
+
+function cam_context_ads_settings_block() {
+	$ads = \get_option( 'cam_context_ads', array() );
+	if ( ! \is_array( $ads ) ) {
+		$ads = array();
+	}
+
+	$impression_stats = \get_option( 'cam_ad_impression_stats', array() );
+	if ( ! \is_array( $impression_stats ) ) {
+		$impression_stats = array();
+	}
+
+	$needs_update = false;
+
+	foreach ( $ads as $index => $ad ) {
+		$ad_id = isset( $ad['id'] ) ? (string) $ad['id'] : '';
+
+	if ( '' === $ad_id ) {
+		$ads[ $index ]['id'] = 'cam-context-' . ( $index + 1 ) . '-' . wp_generate_password( 6, false, false );
+		$needs_update = true;
+	}
+	}
+
+	if ( $needs_update ) {
+		\update_option( 'cam_context_ads', array_values( $ads ) );
+	}
+
+	$edit_id = isset( $_GET['cam_edit_context_ad'] ) ? sanitize_text_field( wp_unslash( $_GET['cam_edit_context_ad'] ) ) : '';
+
+	$item = array(
+		'id'                 => '',
+		'enabled'            => 1,
+		'status'             => 'active',
+		'genre'              => '',
+		'advertiser'         => '',
+
+		'start_date'         => '',
+		'end_date'           => '',
+
+		'top_headline'       => '',
+		'top_image'          => '',
+		'top_destination'    => '',
+
+		'middle_headline'    => '',
+		'middle_image'       => '',
+		'middle_destination' => '',
+
+		'bottom_headline'    => '',
+		'bottom_image'       => '',
+		'bottom_destination' => '',
+	);
+
+	if ( '' !== $edit_id ) {
+		foreach ( $ads as $ad ) {
+			$ad_id = isset( $ad['id'] ) ? (string) $ad['id'] : '';
+			if ( $ad_id === $edit_id ) {
+				$item = array_merge( $item, $ad );
+				break;
+			}
+		}
 	}
 	?>
 	<h2>コンテキスト広告設定</h2>
 	<p>genre に一致した記事に対して、上・中・下の3段階で広告を表示します。</p>
 
-	<table class="form-table" role="presentation">
-		<tbody>
-			<tr>
-				<th scope="row"><label for="cam_context_enabled">有効化</label></th>
-				<td>
-					<input type="checkbox" id="cam_context_enabled" name="cam_context_ads[0][enabled]" value="1" <?php \checked( ! empty( $item['enabled'] ) ); ?>>
-					genre一致時に広告を表示
-				</td>
-			</tr>
+	<?php if ( isset( $_GET['cam_context_saved'] ) ) : ?>
+		<div class="notice notice-success is-dismissible"><p>コンテキスト広告を保存しました。</p></div>
+	<?php endif; ?>
 
-			<tr>
-				<th scope="row"><label for="cam_context_status">状態</label></th>
-				<td>
-					<select id="cam_context_status" name="cam_context_ads[0][status]">
-						<option value="active" <?php \selected( $item['status'], 'active' ); ?>>active</option>
-						<option value="inactive" <?php \selected( $item['status'], 'inactive' ); ?>>inactive</option>
-					</select>
-				</td>
-			</tr>
+	<?php if ( isset( $_GET['cam_context_deleted'] ) ) : ?>
+		<div class="notice notice-success is-dismissible"><p>コンテキスト広告を削除しました。</p></div>
+	<?php endif; ?>
 
-			<tr>
-				<th scope="row"><label for="cam_context_genre">genre</label></th>
-				<td>
-					<select id="cam_context_genre" name="cam_context_ads[0][genre]">
-						<option value="">未設定</option>
-						<option value="fashion" <?php \selected( $item['genre'], 'fashion' ); ?>>fashion</option>
-						<option value="travel" <?php \selected( $item['genre'], 'travel' ); ?>>travel</option>
-						<option value="car" <?php \selected( $item['genre'], 'car' ); ?>>car</option>
-						<option value="culture" <?php \selected( $item['genre'], 'culture' ); ?>>culture</option>
-					</select>
-				</td>
-			</tr>
+	<form method="post" action="<?php echo \esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:40px;">
+		<?php wp_nonce_field( 'cam_save_context_ad' ); ?>
+		<input type="hidden" name="action" value="cam_save_context_ad">
+		<input type="hidden" name="cam_context_id" value="<?php echo \esc_attr( $item['id'] ); ?>">
 
-			<tr>
-				<th scope="row"><label for="cam_context_advertiser">広告主</label></th>
-				<td>
-					<input type="text" id="cam_context_advertiser" name="cam_context_ads[0][advertiser]" value="<?php echo \esc_attr( $item['advertiser'] ); ?>" class="regular-text">
-				</td>
-			</tr>
-		</tbody>
-	</table>
+		<table class="form-table" role="presentation">
+			<tbody>
+				<tr>
+					<th scope="row"><label for="cam_context_enabled">有効化</label></th>
+					<td>
+						<input type="checkbox" id="cam_context_enabled" name="cam_context_enabled" value="1" <?php \checked( ! empty( $item['enabled'] ) ); ?>>
+						genre一致時に広告を表示
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="cam_context_status">状態</label></th>
+					<td>
+						<select id="cam_context_status" name="cam_context_status">
+							<option value="active" <?php \selected( $item['status'], 'active' ); ?>>active</option>
+							<option value="inactive" <?php \selected( $item['status'], 'inactive' ); ?>>inactive</option>
+						</select>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="cam_context_genre">genre</label></th>
+					<td>
+						<select id="cam_context_genre" name="cam_context_genre">
+							<option value="">未設定</option>
+
+							<option value="suit" <?php \selected( $item['genre'], 'suit' ); ?>>fashion / suit</option>
+							<option value="casual" <?php \selected( $item['genre'], 'casual' ); ?>>fashion / casual</option>
+							<option value="vintage" <?php \selected( $item['genre'], 'vintage' ); ?>>fashion / vintage</option>
+
+							<option value="japan" <?php \selected( $item['genre'], 'japan' ); ?>>travel / japan</option>
+							<option value="international" <?php \selected( $item['genre'], 'international' ); ?>>travel / international</option>
+
+							<option value="book" <?php \selected( $item['genre'], 'book' ); ?>>culture / book</option>
+							<option value="movie" <?php \selected( $item['genre'], 'movie' ); ?>>culture / movie</option>
+						</select>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="cam_context_advertiser">広告主</label></th>
+					<td>
+						<input type="text" id="cam_context_advertiser" name="cam_context_advertiser" value="<?php echo \esc_attr( $item['advertiser'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_start_date">掲載開始日</label></th>
+					<td>
+						<input type="date" id="cam_context_start_date" name="cam_context_start_date" value="<?php echo \esc_attr( $item['start_date'] ); ?>">
+						<p class="description">空欄なら開始日の制限なし</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="cam_context_end_date">掲載終了日</label></th>
+					<td>
+						<input type="date" id="cam_context_end_date" name="cam_context_end_date" value="<?php echo \esc_attr( $item['end_date'] ); ?>">
+						<p class="description">空欄なら終了日の制限なし</p>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<hr>
+
+		<h3>上段広告（ブランド認知）</h3>
+		<table class="form-table" role="presentation">
+			<tbody>
+				<tr>
+					<th scope="row"><label for="cam_context_top_headline">見出し</label></th>
+					<td>
+						<input type="text" id="cam_context_top_headline" name="cam_context_top_headline" value="<?php echo \esc_attr( $item['top_headline'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_top_image">画像URL</label></th>
+					<td>
+						<input type="url" id="cam_context_top_image" name="cam_context_top_image" value="<?php echo \esc_attr( $item['top_image'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_top_destination">遷移先URL</label></th>
+					<td>
+						<input type="url" id="cam_context_top_destination" name="cam_context_top_destination" value="<?php echo \esc_attr( $item['top_destination'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<hr>
+
+		<h3>中段広告（キーメッセージ）</h3>
+		<table class="form-table" role="presentation">
+			<tbody>
+				<tr>
+					<th scope="row"><label for="cam_context_middle_headline">見出し</label></th>
+					<td>
+						<input type="text" id="cam_context_middle_headline" name="cam_context_middle_headline" value="<?php echo \esc_attr( $item['middle_headline'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_middle_image">画像URL</label></th>
+					<td>
+						<input type="url" id="cam_context_middle_image" name="cam_context_middle_image" value="<?php echo \esc_attr( $item['middle_image'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_middle_destination">遷移先URL</label></th>
+					<td>
+						<input type="url" id="cam_context_middle_destination" name="cam_context_middle_destination" value="<?php echo \esc_attr( $item['middle_destination'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<hr>
+
+		<h3>下段広告（クロージング）</h3>
+		<table class="form-table" role="presentation">
+			<tbody>
+				<tr>
+					<th scope="row"><label for="cam_context_bottom_headline">見出し</label></th>
+					<td>
+						<input type="text" id="cam_context_bottom_headline" name="cam_context_bottom_headline" value="<?php echo \esc_attr( $item['bottom_headline'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_bottom_image">画像URL</label></th>
+					<td>
+						<input type="url" id="cam_context_bottom_image" name="cam_context_bottom_image" value="<?php echo \esc_attr( $item['bottom_image'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_bottom_destination">遷移先URL</label></th>
+					<td>
+						<input type="url" id="cam_context_bottom_destination" name="cam_context_bottom_destination" value="<?php echo \esc_attr( $item['bottom_destination'] ); ?>" class="regular-text">
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<?php submit_button( '' === $item['id'] ? 'コンテキスト広告を登録する' : 'コンテキスト広告を更新する' ); ?>
+	</form>
 
 	<hr>
 
-	<h3>上段広告（ブランド認知）</h3>
-	<p>タイトル下などに表示する想定です。まずはロゴやブランド名訴求に使います。</p>
-	<table class="form-table" role="presentation">
-		<tbody>
-			<tr>
-				<th scope="row"><label for="cam_context_top_headline">見出し</label></th>
-				<td>
-					<input type="text" id="cam_context_top_headline" name="cam_context_ads[0][top_headline]" value="<?php echo \esc_attr( $item['top_headline'] ); ?>" class="regular-text">
-					<p class="description">例：KITON</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="cam_context_top_image">画像URL</label></th>
-				<td>
-					<input type="url" id="cam_context_top_image" name="cam_context_ads[0][top_image]" value="<?php echo \esc_attr( $item['top_image'] ); ?>" class="regular-text">
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="cam_context_top_destination">遷移先URL</label></th>
-				<td>
-					<input type="url" id="cam_context_top_destination" name="cam_context_ads[0][top_destination]" value="<?php echo \esc_attr( $item['top_destination'] ); ?>" class="regular-text">
-				</td>
-			</tr>
-		</tbody>
-	</table>
+	<h3>設定済み広告情報</h3>
+	<p>以下は登録済みのコンテキスト広告です。</p>
 
-	<hr>
+	<?php if ( empty( $ads ) ) : ?>
+		<p>まだ広告は登録されていません。</p>
+	<?php else : ?>
+		<table class="widefat striped" style="max-width: 1100px;">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>広告主</th>
+					<th>genre</th>
+					<th>状態</th>
+					<th>開始日</th>
+					<th>終了日</th>
+					<th>表示回数</th>
+					<th>上</th>
+					<th>中</th>
+					<th>下</th>
+					<th>bottom到達</th>
+					<th>10秒</th>
+					<th>30秒</th>
+					<th>60秒</th>
+					<th>最終滞在</th>
+					<th>クリック</th>
+					<th>上クリック</th>
+					<th>中クリック</th>
+					<th>下クリック</th>
+					<th>最終クリック</th>
+					<th>最終表示</th>
+					<th>上段見出し</th>
+					<th>中段見出し</th>
+					<th>下段見出し</th>
+					<th>操作</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $ads as $ad ) : ?>
+					<?php
+					$ad_id = isset( $ad['id'] ) ? (string) $ad['id'] : '';
 
-	<h3>中段広告（キーメッセージ）</h3>
-	<p>記事の途中で、ブランドの価値や主メッセージを伝える想定です。</p>
-	<table class="form-table" role="presentation">
-		<tbody>
-			<tr>
-				<th scope="row"><label for="cam_context_middle_headline">見出し</label></th>
-				<td>
-					<input type="text" id="cam_context_middle_headline" name="cam_context_ads[0][middle_headline]" value="<?php echo \esc_attr( $item['middle_headline'] ); ?>" class="regular-text">
-					<p class="description">例：KITON、あなたのエレガントさを引き立てるスーツ</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="cam_context_middle_image">画像URL</label></th>
-				<td>
-					<input type="url" id="cam_context_middle_image" name="cam_context_ads[0][middle_image]" value="<?php echo \esc_attr( $item['middle_image'] ); ?>" class="regular-text">
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="cam_context_middle_destination">遷移先URL</label></th>
-				<td>
-					<input type="url" id="cam_context_middle_destination" name="cam_context_ads[0][middle_destination]" value="<?php echo \esc_attr( $item['middle_destination'] ); ?>" class="regular-text">
-				</td>
-			</tr>
-		</tbody>
-	</table>
+					$stat = isset( $impression_stats[ $ad_id ] ) && is_array( $impression_stats[ $ad_id ] )
+						? $impression_stats[ $ad_id ]
+						: array();
+					?>
+					<tr>
+						<td><?php echo \esc_html( $ad_id ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['advertiser'] ) ? $ad['advertiser'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['genre'] ) ? $ad['genre'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['status'] ) ? $ad['status'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['start_date'] ) ? $ad['start_date'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['end_date'] ) ? $ad['end_date'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['total'] ) ? (string) $stat['total'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['top'] ) ? (string) $stat['top'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['middle'] ) ? (string) $stat['middle'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['bottom'] ) ? (string) $stat['bottom'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['bottom_reach'] ) ? (string) $stat['bottom_reach'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['time_10'] ) ? (string) $stat['time_10'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['time_30'] ) ? (string) $stat['time_30'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['time_60'] ) ? (string) $stat['time_60'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['last_time_seen'] ) ? (string) $stat['last_time_seen'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['click_total'] ) ? (string) $stat['click_total'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['click_top'] ) ? (string) $stat['click_top'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['click_middle'] ) ? (string) $stat['click_middle'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['click_bottom'] ) ? (string) $stat['click_bottom'] : '0' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['last_click_seen'] ) ? (string) $stat['last_click_seen'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $stat['last_seen'] ) ? (string) $stat['last_seen'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['top_headline'] ) ? $ad['top_headline'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['middle_headline'] ) ? $ad['middle_headline'] : '' ); ?></td>
+						<td><?php echo \esc_html( isset( $ad['bottom_headline'] ) ? $ad['bottom_headline'] : '' ); ?></td>
+						<td>
+							<a class="button button-secondary" href="<?php echo \esc_url( add_query_arg( array(
+								'page' => 'ca-manager',
+								'cam_edit_context_ad' => $ad_id,
+							), admin_url( 'options-general.php' ) ) ); ?>">編集</a>
 
-	<hr>
-
-	<h3>下段広告（クロージング）</h3>
-	<p>記事末尾で、来店・訪問・購入などのクロージングを促す想定です。</p>
-	<table class="form-table" role="presentation">
-		<tbody>
-			<tr>
-				<th scope="row"><label for="cam_context_bottom_headline">見出し</label></th>
-				<td>
-					<input type="text" id="cam_context_bottom_headline" name="cam_context_ads[0][bottom_headline]" value="<?php echo \esc_attr( $item['bottom_headline'] ); ?>" class="regular-text">
-					<p class="description">例：KITONストアでお待ちしています。</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="cam_context_bottom_image">画像URL</label></th>
-				<td>
-					<input type="url" id="cam_context_bottom_image" name="cam_context_ads[0][bottom_image]" value="<?php echo \esc_attr( $item['bottom_image'] ); ?>" class="regular-text">
-				</td>
-			</tr>
-			<tr>
-				<th scope="row"><label for="cam_context_bottom_destination">遷移先URL</label></th>
-				<td>
-					<input type="url" id="cam_context_bottom_destination" name="cam_context_ads[0][bottom_destination]" value="<?php echo \esc_attr( $item['bottom_destination'] ); ?>" class="regular-text">
-				</td>
-			</tr>
-		</tbody>
-	</table>
+							<form method="post" action="<?php echo \esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline-block; margin-left:8px;">
+								<?php wp_nonce_field( 'cam_delete_context_ad' ); ?>
+								<input type="hidden" name="action" value="cam_delete_context_ad">
+								<input type="hidden" name="cam_context_id" value="<?php echo \esc_attr( $ad_id ); ?>">
+								<button type="submit" class="button button-secondary" onclick="return confirm('この広告を削除しますか？');">削除</button>
+							</form>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+	<?php endif; ?>
 	<?php
 }
 

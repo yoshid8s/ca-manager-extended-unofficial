@@ -2515,6 +2515,7 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
     		$ad_description = isset( $ad_item['description'] ) ? (string) $ad_item['description'] : '';
     		$ad_image       = isset( $ad_item['image'] ) ? (string) $ad_item['image'] : '';
     		$ad_author      = isset( $ad_item['advertiser'] ) ? (string) $ad_item['advertiser'] : '';
+			$ad_destination = isset( $ad_item['destination'] ) ? (string) $ad_item['destination'] : '';
 
     		if ( $ad_enabled && 'active' === $ad_status && '' !== $ad_selector && '' !== $ad_id ) {
 				$ad_target_html = '';
@@ -2558,6 +2559,7 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 						date_modified: null,
 						subject_type: 'OnlineAd',
 						target_integrity: $ad_target_integrity,
+						landing_page_url: '' !== $ad_destination ? $ad_destination : null,
 					);
 
 					\array_push( $uca_list, $ad_uca );
@@ -2598,6 +2600,8 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 				$context_headline   = isset( $context_ad['headline'] ) ? (string) $context_ad['headline'] : '';
 				$context_advertiser = isset( $context_ad['advertiser'] ) ? (string) $context_ad['advertiser'] : '';
 				$context_image      = isset( $context_ad['image'] ) ? (string) $context_ad['image'] : '';
+				$context_destination = isset( $context_ad['destination'] ) ? (string) $context_ad['destination'] : '';
+				$context_genre = isset( $context_ad['genre'] ) ? (string) $context_ad['genre'] : '';
 
 				if ( ! $context_enabled || 'active' !== $context_status ) {
 					continue;
@@ -2645,13 +2649,14 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 						target_css_selector: $context_ad_selector,
 						external_resources: array(),
 						headline: $context_headline ?: ( $context_advertiser ?: 'Advertisement' ),
-						description: 'Context Ad / ' . $placement,
+						description: 'Context Ad / ' . $placement . ' / genre=' . $context_genre,
 						image: '' !== $context_image ? $context_image : null,
 						author: '' !== $context_advertiser ? $context_advertiser : null,
 						date_published: null,
 						date_modified: null,
 						subject_type: 'OnlineAd',
 						target_integrity: $context_target_integrity,
+						landing_page_url: '' !== $context_destination ? $context_destination : null,
 					);
 
 					\array_push( $uca_list, $context_ad_uca );
