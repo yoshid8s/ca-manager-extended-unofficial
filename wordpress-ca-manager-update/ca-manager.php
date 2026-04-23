@@ -29,9 +29,14 @@ require_once __DIR__ . '/includes/issue.php';
 require_once __DIR__ . '/includes/post.php';
 \Profile\Post\init();
 
+require_once __DIR__ . '/includes/class-cam-ad-db.php';
+
 require_once plugin_dir_path( __FILE__ ) . 'includes/admin-ad-content.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/context-ads.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/front-ad-insert.php';
+
+require_once __DIR__ . '/includes/front-assigned-ad.php';
+\Profile\FrontAssignedAd\init();
 
 require_once __DIR__ . '/includes/helpers-ui.php';
 require_once __DIR__ . '/includes/admin-embedded-content.php';

@@ -9,72 +9,63 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param int $post_id Post ID
  * @return string
  */
-function cam_get_top_ad_html( $post_id ) {
-	$ad = null;
+function cam_get_top_ad_html( $post_id ) { 
+	$ad = null; 
+	
+	// まず投稿個別の広告設定を優先 
 
-	// まず投稿個別の広告設定を優先
-	$ad_items = get_post_meta( $post_id, '_cam_ad_items', true );
-	if ( is_array( $ad_items ) && ! empty( $ad_items[0] ) ) {
-		$ad = $ad_items[0];
-	}
+	$ad_items = get_post_meta( 
+		$post_id, '_cam_ad_items', true ); 
+		if ( is_array( $ad_items ) && ! empty( $ad_items[0] ) ) {
+			 $ad = $ad_items[0]; 
+		} 
+		// 個別広告が無ければ genre一致のコンテキスト広告を使う 
+		if ( ! is_array( $ad ) || empty( $ad ) ) { 
+			$ad = cam_get_context_ad_for_post( $post_id ); 
+		} 
+		if ( ! is_array( $ad ) || empty( $ad ) ) { 
+			return ''; 
+		} 
+		$enabled = ! empty( $ad['enabled'] ); 
+		$status = isset( $ad['status'] ) ? (string) $ad['status'] : 'unset';
+		$id = isset( $ad['id'] ) ? (string) $ad['id'] : ''; 
+		$headline = isset( $ad['headline'] ) ? (string) $ad['headline'] : '';
+		$advertiser = isset( $ad['advertiser'] ) ? (string) $ad['advertiser'] : ''; 
+		$destination = isset( $ad['destination'] ) ? (string) $ad['destination'] : ''; 
+		$image = isset( $ad['image'] ) ? (string) $ad['image'] : ''; 
+		$ad_code = isset( $ad['ad_code'] ) ? (string) $ad['ad_code'] : ''; 
 
-	// 個別広告が無ければ genre一致のコンテキスト広告を使う
-	if ( ! is_array( $ad ) || empty( $ad ) ) {
-		$ad = cam_get_context_ad_for_post( $post_id );
-	}
-
-	if ( ! is_array( $ad ) || empty( $ad ) ) {
-		return '';
-	}
-
-	$enabled     = ! empty( $ad['enabled'] );
-	$status      = isset( $ad['status'] ) ? (string) $ad['status'] : 'unset';
-	$id          = isset( $ad['id'] ) ? (string) $ad['id'] : '';
-	$headline    = isset( $ad['headline'] ) ? (string) $ad['headline'] : '';
-	$advertiser  = isset( $ad['advertiser'] ) ? (string) $ad['advertiser'] : '';
-	$destination = isset( $ad['destination'] ) ? (string) $ad['destination'] : '';
-	$image       = isset( $ad['image'] ) ? (string) $ad['image'] : '';
-	$ad_code     = isset( $ad['ad_code'] ) ? (string) $ad['ad_code'] : '';
-
-	// まずは enabled と active の両方を条件にする
-	if ( ! $enabled || 'active' !== $status ) {
-		return '';
-	}
-
-	// id が無い場合はコンテキスト広告用に自動付与
-	if ( '' === $id ) {
-		$id = 'cam-context-ad-' . $post_id;
-	}
-
-	$label = $headline;
-	if ( '' === $label ) {
-		$label = $advertiser ? $advertiser : 'Advertisement';
-	}
-
-	$html  = '<div class="cam-top-ad-slot" data-cam-placement="top_under_title">';
-	$html .= '<div class="cam-top-ad-inner">';
-
-	// まずは画像広告優先
-	if ( '' !== $image ) {
-		$image_html = '<img id="' . esc_attr( $id ) . '" src="' . esc_url( $image ) . '" alt="' . esc_attr( $label ) . '" class="cam-top-ad-image">';
-
-		if ( '' !== $destination ) {
-			$html .= '<a href="' . esc_url( $destination ) . '" class="cam-top-ad-link">';
-			$html .= $image_html;
-			$html .= '</a>';
-		} else {
-			$html .= $image_html;
-		}
-	} elseif ( '' !== $ad_code ) {
-		$html .= $ad_code;
-	} else {
-		$html .= '<div class="cam-top-ad-placeholder">' . esc_html( $label ) . '</div>';
-	}
-
-	$html .= '</div>';
-	$html .= '</div>';
-
-	return $html;
+		// まずは enabled と active の両方を条件にする 
+		if ( ! $enabled || 'active' !== $status ) { return ''; } 
+		
+		// id が無い場合はコンテキスト広告用に自動付与 
+		if ( '' === $id ) { 
+			$id = 'cam-context-ad-' . $post_id; 
+		} 
+		$label = $headline; 
+		if ( '' === $label ) { $label = $advertiser ? $advertiser : 'Advertisement'; 
+		} 
+		$html = '<div class="cam-top-ad-slot" data-cam-placement="top_under_title">'; 
+		$html .= '<div class="cam-top-ad-inner">'; 
+		
+		// まずは画像広告優先 
+		if ( '' !== $image ) { 
+			$image_html = '<img id="' . esc_attr( $id ) . '" src="' . esc_url( $image ) . '" alt="' . esc_attr( $label ) . '" class="cam-top-ad-image">'; 
+			if ( '' !== $destination ) { 
+				$html .= '<a href="' . esc_url( $destination ) . '" class="cam-top-ad-link">'; 
+				$html .= $image_html; 
+				$html .= '</a>'; 
+			} else { 
+				$html .= $image_html; 
+			} 
+		} elseif ( '' !== $ad_code ) { 
+			$html .= $ad_code; 
+		} else { 
+			$html .= '<div class="cam-top-ad-placeholder">' . esc_html( $label ) . '</div>'; 
+		} 
+		$html .= '</div>'; 
+		$html .= '</div>'; 
+		return $html; 
 }
 
 /**

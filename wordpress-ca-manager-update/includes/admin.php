@@ -13,7 +13,16 @@ use const Profile\Config\PROFILE_DEFAULT_CA_LOG_DIR;
 /** 管理者画面の初期化 */
 function init() {
 	\add_action( 'admin_menu', '\Profile\Admin\add_options_page' );
+	\add_action( 'admin_menu', '\Profile\Admin\add_ad_options_pages', 11 );
 	\add_action( 'admin_init', '\Profile\Admin\register_settings' );
+	\add_action( 'admin_post_cam_ad_slot_create', '\Profile\Admin\handle_ad_slot_create' );
+	\add_action( 'admin_post_cam_ad_application_create', '\Profile\Admin\handle_ad_application_create' );
+	\add_action( 'admin_post_cam_ad_slot_deactivate', '\Profile\Admin\handle_ad_slot_deactivate' );
+	\add_action( 'admin_post_cam_ad_application_approve', '\Profile\Admin\handle_ad_application_approve' );
+	\add_action( 'admin_post_cam_ad_application_reject', '\Profile\Admin\handle_ad_application_reject' );
+	\add_action( 'admin_post_cam_ad_application_ready', '\Profile\Admin\handle_ad_application_ready' );
+	\add_action( 'admin_post_cam_ad_application_issue_ca', '\Profile\Admin\handle_ad_application_issue_ca' );
+	\add_action( 'admin_post_cam_ad_application_assign_post', '\Profile\Admin\handle_ad_application_assign_post' );
 	\add_action(
 		'admin_post_profile_ca_download_log',
 		function () {
@@ -42,8 +51,7 @@ function init() {
 			header( 'Content-Disposition: attachment; filename="ca-manager-debug.log"' );
 			header( 'Content-Length: ' . strlen( $contents_safe ) );
 			header( 'X-Content-Type-Options: nosniff' );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-			echo $contents_safe;
+			echo $contents_safe; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			exit;
 		}
 	);
@@ -71,6 +79,73 @@ function init() {
 /** 設定画面の追加 */
 function add_options_page() {
 	\add_options_page( 'CA Manager', 'CA Manager', 'manage_options', 'ca-manager', '\Profile\Admin\settings_page' );
+}
+
+/** 広告管理ページの追加 */
+function add_ad_options_pages() {
+	\add_menu_page(
+		'CA広告管理',
+		'CA広告管理',
+		'manage_options',
+		'cam-ad-main',
+		'\Profile\Admin\ad_applications_page',
+		'dashicons-megaphone',
+		25
+	);
+
+	// ★ これを追加（親と同じスラッグ）
+	\add_submenu_page(
+		'cam-ad-main',
+		'CA広告管理',
+		'CA広告管理',
+		'manage_options',
+		'cam-ad-main',
+		'\Profile\Admin\ad_applications_page'
+	);
+
+	\add_submenu_page(
+		'cam-ad-main',
+		'広告枠設定',
+		'広告枠設定',
+		'manage_options',
+		'cam-ad-slots',
+		'\Profile\Admin\ad_slots_page'
+	);
+
+	\add_submenu_page(
+		'cam-ad-main',
+		'広告申込一覧',
+		'広告申込一覧',
+		'manage_options',
+		'cam-ad-applications',
+		'\Profile\Admin\ad_applications_page'
+	);
+
+	\add_submenu_page(
+		'cam-ad-main',
+		'承認済広告',
+		'承認済広告',
+		'manage_options',
+		'cam-ad-approved',
+		'\Profile\Admin\ad_approved_page'
+	);
+
+	\add_submenu_page(
+		'cam-ad-main',
+		'広告統計',
+		'広告統計',
+		'manage_options',
+		'cam-ad-stats',
+		'\Profile\Admin\ad_stats_page'
+	);
+	\add_submenu_page(
+		null,
+		'広告申込詳細',
+		'広告申込詳細',
+		'manage_options',
+		'cam-ad-application-detail',
+		'\Profile\Admin\ad_application_detail_page'
+	);
 }
 
 /** 設定項目の追加 */
@@ -891,4 +966,1819 @@ function add_action_links( array $actions ) {
 	array_unshift( $actions, $menu_settings_url );
 
 	return $actions;
+}
+
+/** 広告枠設定ページ */
+function ad_slots_page() {
+	$slots   = get_ad_slots();
+	$message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
+	?>
+	<div class="wrap">
+		<h1>広告枠設定</h1>
+
+		<?php if ( 'created' === $message ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>広告枠を登録しました。</p>
+			</div>
+		<?php elseif ( 'error_required' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>枠コード・枠名・genreは必須です。</p>
+			</div>
+		<?php elseif ( 'error_duplicate' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>同じ枠コードが既に存在します。別の枠コードを入力してください。</p>
+			</div>
+		<?php elseif ( 'error_db' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>DB保存時にエラーが発生しました。</p>
+			</div>
+		<?php elseif ( 'deactivated' === $message ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>広告枠を無効化しました。</p>
+			</div>
+		<?php elseif ( 'error_invalid_slot' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>対象の広告枠が不正です。</p>
+			</div>
+		<?php endif; ?>
+
+		<h2>新規広告枠登録</h2>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="cam_ad_slot_create">
+			<?php wp_nonce_field( 'cam_ad_slot_create' ); ?>
+
+			<table class="form-table" role="presentation">
+				<tbody>
+					<tr>
+						<th scope="row"><label for="slot_code">枠コード</label></th>
+						<td>
+							<input name="slot_code" type="text" id="slot_code" class="regular-text" placeholder="fashion_top">
+							<p class="description">半角英数字とアンダースコア推奨。重複不可。</p>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="slot_name">枠名</label></th>
+						<td>
+							<input name="slot_name" type="text" id="slot_name" class="regular-text" placeholder="Fashion 上段枠">
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="genre">genre</label></th>
+						<td>
+							<?php $genre_options = get_ad_slot_genre_options(); ?>
+							<select name="genre" id="genre">
+								<option value="">選択してください</option>
+								<?php foreach ( $genre_options as $value => $label ) : ?>
+									<option value="<?php echo esc_attr( $value ); ?>">
+										<?php echo esc_html( $label ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="page_type">ページ種別</label></th>
+						<td>
+							<select name="page_type" id="page_type">
+								<option value="post">post</option>
+								<option value="page">page</option>
+								<option value="archive">archive</option>
+							</select>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="status">状態</label></th>
+						<td>
+							<select name="status" id="status">
+								<option value="active">active</option>
+								<option value="inactive">inactive</option>
+							</select>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="description">説明</label></th>
+						<td>
+							<textarea name="description" id="description" rows="4" class="large-text" placeholder="この広告枠の用途や対象ページなど"></textarea>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<?php submit_button( '広告枠を登録する' ); ?>
+		</form>
+
+		<hr>
+
+		<h2>登録済み広告枠</h2>
+
+		<?php if ( empty( $slots ) ) : ?>
+			<p>まだ広告枠は登録されていません。</p>
+		<?php else : ?>
+			<table class="widefat fixed striped">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>枠コード</th>
+						<th>枠名</th>
+						<th>genre</th>
+						<th>ページ種別</th>
+						<th>状態</th>
+						<th>登録日時</th>
+						<th>操作</th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $slots as $slot ) : ?>
+						<tr>
+							<td><?php echo esc_html( $slot['id'] ); ?></td>
+							<td><?php echo esc_html( $slot['slot_code'] ); ?></td>
+							<td><?php echo esc_html( $slot['slot_name'] ); ?></td>
+							<td><?php echo esc_html( $slot['genre'] ); ?></td>
+							<td><?php echo esc_html( $slot['page_type'] ); ?></td>
+							<td><?php echo esc_html( $slot['status'] ); ?></td>
+							<td><?php echo esc_html( $slot['created_at'] ); ?></td>
+							<td>
+								<a href="#" onclick="return false;">編集（準備中）</a> |
+								<?php if ( 'active' === $slot['status'] ) : ?>
+									<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array(
+										'action'  => 'cam_ad_slot_deactivate',
+										'slot_id' => $slot['id'],
+									), admin_url( 'admin-post.php' ) ), 'cam_ad_slot_deactivate_' . $slot['id'] ) ); ?>">無効化</a>
+								<?php else : ?>
+									<span>無効</span>
+								<?php endif; ?>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php endif; ?>
+	</div>
+	<?php
+}
+
+/**
+ * 広告枠用 genre 候補
+ *
+ * @return array
+ */
+function get_ad_slot_genre_options() {
+	return array(
+		'fashion_suit'   => 'fashion / suit',
+		'fashion_casual' => 'fashion / casual',
+		'watch'          => 'watch',
+		'shoe_elegant'   => 'shoe / elegant',
+		'shoe_rugged'    => 'shoe / rugged',
+		'lifestyle'      => 'lifestyle',
+		'culture_book'   => 'culture / book',
+		'culture_movie'  => 'culture / movie',
+	);
+}
+
+/** 広告申込一覧ページ */
+function ad_applications_page() {
+	$slots        = get_active_ad_slots_for_select();
+	$applications = get_ad_applications();
+	$message      = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
+	?>
+	<div class="wrap">
+		<h1>広告申込登録</h1>
+
+		<?php if ( 'created' === $message ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>広告申込を登録しました。</p>
+			</div>
+		<?php elseif ( 'error_required' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>広告主名・genre・広告枠・掲載開始日・掲載終了日は必須です。</p>
+			</div>
+		<?php elseif ( 'error_slot' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>選択した広告枠が不正です。</p>
+			</div>
+		<?php elseif ( 'error_date' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>掲載開始日と掲載終了日の指定が不正です。</p>
+			</div>
+		<?php elseif ( 'error_db' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>DB保存時にエラーが発生しました。</p>
+			</div>
+		<?php elseif ( 'error_genre_mismatch' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>広告枠とgenreが一致していません。</p>
+			</div>
+		<?php elseif ( 'approved' === $message ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>広告申込を承認しました。</p>
+			</div>
+		<?php elseif ( 'rejected' === $message ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>広告申込を却下しました。</p>
+			</div>
+		<?php elseif ( 'error_invalid_application' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>対象の広告申込が不正です。</p>
+			</div>
+		<?php endif; ?>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="cam_ad_application_create">
+			<?php wp_nonce_field( 'cam_ad_application_create' ); ?>
+
+			<h2>申込基本情報</h2>
+
+			<table class="form-table" role="presentation">
+				<tbody>
+					<tr>
+						<th scope="row"><label for="advertiser_name">広告主名</label></th>
+						<td>
+							<input name="advertiser_name" type="text" id="advertiser_name" class="regular-text" placeholder="A広告主">
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="genre">genre</label></th>
+						<td>
+							<?php $genre_options = get_ad_slot_genre_options(); ?>
+							<select name="genre" id="genre">
+								<option value="">選択してください</option>
+								<?php foreach ( $genre_options as $value => $label ) : ?>
+									<option value="<?php echo esc_attr( $value ); ?>">
+										<?php echo esc_html( $label ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="slot_id">広告枠</label></th>
+						<td>
+							<select name="slot_id" id="slot_id">
+								<option value="">選択してください</option>
+								<?php foreach ( $slots as $slot ) : ?>
+									<option value="<?php echo esc_attr( $slot['id'] ); ?>">
+										<?php
+										echo esc_html(
+											$slot['slot_name'] . ' / ' .
+											$slot['slot_code'] . ' / ' .
+											$slot['genre']
+										);
+										?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="start_date">掲載開始日</label></th>
+						<td>
+							<input name="start_date" type="date" id="start_date">
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="end_date">掲載終了日</label></th>
+						<td>
+							<input name="end_date" type="date" id="end_date">
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="bid_type">単価種別</label></th>
+						<td>
+							<select name="bid_type" id="bid_type">
+								<option value="fixed">fixed</option>
+								<option value="cpm">cpm</option>
+								<option value="cpc">cpc</option>
+							</select>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="bid_price">希望単価</label></th>
+						<td>
+							<input name="bid_price" type="number" id="bid_price" class="small-text" step="0.01" min="0" value="0">
+						</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<hr>
+
+			<h2>広告クリエイティブ</h2>
+
+			<h3>上段広告</h3>
+			<table class="form-table" role="presentation">
+				<tbody>
+					<tr>
+						<th scope="row"><label for="top_headline">見出し</label></th>
+						<td><input name="top_headline" type="text" id="top_headline" class="regular-text"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="top_image_url">画像URL</label></th>
+						<td><input name="top_image_url" type="url" id="top_image_url" class="large-text"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="top_landing_url">リンク先URL</label></th>
+						<td><input name="top_landing_url" type="url" id="top_landing_url" class="large-text"></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<h3>中段広告</h3>
+			<table class="form-table" role="presentation">
+				<tbody>
+					<tr>
+						<th scope="row"><label for="middle_headline">見出し</label></th>
+						<td><input name="middle_headline" type="text" id="middle_headline" class="regular-text"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="middle_image_url">画像URL</label></th>
+						<td><input name="middle_image_url" type="url" id="middle_image_url" class="large-text"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="middle_landing_url">リンク先URL</label></th>
+						<td><input name="middle_landing_url" type="url" id="middle_landing_url" class="large-text"></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<h3>下段広告</h3>
+			<table class="form-table" role="presentation">
+				<tbody>
+					<tr>
+						<th scope="row"><label for="bottom_headline">見出し</label></th>
+						<td><input name="bottom_headline" type="text" id="bottom_headline" class="regular-text"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bottom_image_url">画像URL</label></th>
+						<td><input name="bottom_image_url" type="url" id="bottom_image_url" class="large-text"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bottom_landing_url">リンク先URL</label></th>
+						<td><input name="bottom_landing_url" type="url" id="bottom_landing_url" class="large-text"></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<?php submit_button( '広告申込を登録する' ); ?>
+		</form>
+		<hr>
+
+		<h2>登録済み広告申込</h2>
+
+		<?php if ( empty( $applications ) ) : ?>
+			<p>まだ広告申込は登録されていません。</p>
+		<?php else : ?>
+			<table class="widefat fixed striped">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>受付番号</th>
+						<th>広告主名</th>
+						<th>genre</th>
+						<th>広告枠</th>
+						<th>掲載期間</th>
+						<th>単価</th>
+						<th>状態</th>
+						<th>登録日時</th>
+						<th>操作</th>
+					</tr>
+				</thead>
+			<tbody>
+				<?php foreach ( $applications as $application ) : ?>
+					<tr>
+						<td><?php echo esc_html( $application['id'] ); ?></td>
+						<td><?php echo esc_html( $application['application_code'] ); ?></td>
+						<td><?php echo esc_html( $application['advertiser_name_snapshot'] ); ?></td>
+						<td><?php echo esc_html( $application['genre'] ); ?></td>
+						<td>
+							<?php
+							echo esc_html(
+								( $application['slot_name'] ? $application['slot_name'] : '未設定' ) .
+								' / ' .
+								( $application['slot_code'] ? $application['slot_code'] : '-' )
+							);
+							?>
+						</td>
+						<td>
+							<?php
+							echo esc_html(
+								$application['start_date'] . ' ～ ' . $application['end_date']
+							);
+							?>
+						</td>
+						<td>
+							<?php
+							echo esc_html(
+								$application['bid_type'] . ' / ' . $application['bid_price']
+							);
+							?>
+						</td>
+						<td><?php echo esc_html( $application['status'] ); ?></td>
+						<td><?php echo esc_html( $application['created_at'] ); ?></td>
+						<td>
+							<?php if ( 'pending' === $application['status'] ) : ?>
+								<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array(
+									'action'         => 'cam_ad_application_approve',
+									'application_id' => $application['id'],
+								), admin_url( 'admin-post.php' ) ), 'cam_ad_application_approve_' . $application['id'] ) ); ?>">承認</a>
+								|
+								<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array(
+									'action'         => 'cam_ad_application_reject',
+									'application_id' => $application['id'],
+								), admin_url( 'admin-post.php' ) ), 'cam_ad_application_reject_' . $application['id'] ) ); ?>">却下</a>
+								|
+								<a href="<?php echo esc_url( add_query_arg(
+									array(
+										'page'           => 'cam-ad-application-detail',
+										'application_id' => $application['id'],
+									),
+									admin_url( 'admin.php' )
+								) ); ?>">詳細</a>
+
+							<?php elseif ( 'approved' === $application['status'] ) : ?>
+								<span>承認済</span>
+								|
+								<a href="<?php echo esc_url( add_query_arg(
+									array(
+										'page'           => 'cam-ad-application-detail',
+										'application_id' => $application['id'],
+									),
+									admin_url( 'admin.php' )
+								) ); ?>">詳細</a>
+
+							<?php elseif ( 'ready' === $application['status'] ) : ?>
+								<span>配信対象</span>
+								|
+								<a href="<?php echo esc_url( add_query_arg(
+									array(
+										'page'           => 'cam-ad-application-detail',
+										'application_id' => $application['id'],
+									),
+									admin_url( 'admin.php' )
+								) ); ?>">詳細</a>
+
+							<?php elseif ( 'rejected' === $application['status'] ) : ?>
+								<span>却下済</span>
+								|
+								<a href="<?php echo esc_url( add_query_arg(
+									array(
+										'page'           => 'cam-ad-application-detail',
+										'application_id' => $application['id'],
+									),
+									admin_url( 'admin.php' )
+								) ); ?>">詳細</a>
+
+							<?php else : ?>
+								<a href="<?php echo esc_url( add_query_arg(
+									array(
+										'page'           => 'cam-ad-application-detail',
+										'application_id' => $application['id'],
+									),
+									admin_url( 'admin.php' )
+								) ); ?>">詳細</a>
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+	<?php endif; ?>
+	</div>
+	<?php
+}
+
+/** 承認済広告ページ */
+function ad_approved_page() {
+	$applications = get_approved_ad_applications();
+	$posts        = get_ad_assignable_posts();
+	$message      = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
+	
+	?>
+	<div class="wrap">
+		<h1>承認済広告</h1>
+
+		<?php if ( 'ready' === $message ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>広告を配信対象に設定しました。</p>
+			</div>
+		<?php elseif ( 'error_invalid_application' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>対象の広告申込が不正です。</p>
+			</div>
+		<?php elseif ( 'error_db' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>DB更新時にエラーが発生しました。</p>
+			</div>
+		<?php elseif ( 'error_assign_required' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>掲載先投稿を選択してください。</p>
+			</div>
+		<?php elseif ( 'error_invalid_post' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>掲載先投稿が不正です。</p>
+			</div>
+		<?php endif; ?>
+
+		<?php if ( empty( $applications ) ) : ?>
+			<p>承認済みの広告はまだありません。</p>
+		<?php else : ?>
+			<table class="widefat fixed striped">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>受付番号</th>
+						<th>広告主名</th>
+						<th>genre</th>
+						<th>広告枠</th>
+						<th>掲載期間</th>
+						<th>単価</th>
+						<th>承認日時</th>
+						<th>操作</th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $applications as $application ) : ?>
+						<tr>
+							<td><?php echo esc_html( $application['id'] ); ?></td>
+							<td><?php echo esc_html( $application['application_code'] ); ?></td>
+							<td><?php echo esc_html( $application['advertiser_name_snapshot'] ); ?></td>
+							<td><?php echo esc_html( $application['genre'] ); ?></td>
+							<td>
+								<?php
+								echo esc_html(
+									( $application['slot_name'] ? $application['slot_name'] : '未設定' ) .
+									' / ' .
+									( $application['slot_code'] ? $application['slot_code'] : '-' )
+								);
+								?>
+							</td>
+							<td>
+								<?php
+								echo esc_html(
+									$application['start_date'] . ' ～ ' . $application['end_date']
+								);
+								?>
+							</td>
+							<td>
+								<?php
+								echo esc_html(
+									$application['bid_type'] . ' / ' . $application['bid_price']
+								);
+								?>
+							</td>
+							<td><?php echo esc_html( $application['approved_at'] ); ?></td>
+							<td>
+								<?php if ( 'approved' === $application['status'] ) : ?>
+									<a href="<?php echo esc_url( wp_nonce_url( add_query_arg(
+										array(
+											'action'         => 'cam_ad_application_ready',
+											'application_id' => $application['id'],
+										),
+										admin_url( 'admin-post.php' )
+									), 'cam_ad_application_ready_' . $application['id'] ) ); ?>">配信対象にする</a>
+									|
+									<a href="<?php echo esc_url( add_query_arg(
+										array(
+											'page'           => 'cam-ad-application-detail',
+											'application_id' => $application['id'],
+										),
+										admin_url( 'admin.php' )
+									) ); ?>">詳細</a>
+
+								<?php elseif ( 'ready' === $application['status'] ) : ?>
+									<span>配信対象</span>
+									|
+									<a href="<?php echo esc_url( add_query_arg(
+										array(
+											'page'           => 'cam-ad-application-detail',
+											'application_id' => $application['id'],
+										),
+										admin_url( 'admin.php' )
+									) ); ?>">詳細</a>
+
+									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:8px;">
+										<input type="hidden" name="action" value="cam_ad_application_assign_post">
+										<input type="hidden" name="application_id" value="<?php echo esc_attr( $application['id'] ); ?>">
+										<?php wp_nonce_field( 'cam_ad_application_assign_post_' . $application['id'] ); ?>
+
+										<select name="post_id">
+											<option value="">掲載先投稿を選択</option>
+											<?php foreach ( $posts as $candidate_post ) : ?>
+												<option value="<?php echo esc_attr( $candidate_post->ID ); ?>">
+													<?php echo esc_html( $candidate_post->post_title . ' (ID:' . $candidate_post->ID . ')' ); ?>
+												</option>
+											<?php endforeach; ?>
+										</select>
+
+										<button type="submit" class="button button-secondary">投稿へ割当</button>
+									</form>
+
+								<?php else : ?>
+									<a href="<?php echo esc_url( add_query_arg(
+										array(
+											'page'           => 'cam-ad-application-detail',
+											'application_id' => $application['id'],
+										),
+										admin_url( 'admin.php' )
+									) ); ?>">詳細</a>
+								<?php endif; ?>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php endif; ?>
+	</div>
+	<?php
+}
+
+/**
+ * 広告申込詳細ページ
+ */
+function ad_application_detail_page() {
+	$application_id = isset( $_GET['application_id'] ) ? absint( $_GET['application_id'] ) : 0;
+	$application    = get_ad_application_by_id( $application_id );
+	$items          = get_ad_application_items( $application_id );
+	$message        = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( $_GET['message'] ) ) : '';
+
+	?>
+	<div class="wrap">
+		<h1>広告申込詳細</h1>
+
+		<?php if ( 'ca_issued' === $message ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>広告CAを発行し、CA状態を更新しました。</p>
+			</div>
+		<?php elseif ( 'error_not_ready' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>この広告申込はまだ配信対象ではないため、CA発行できません。</p>
+			</div>
+		<?php elseif ( 'error_no_items' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>広告クリエイティブが存在しないため、CA発行できません。</p>
+			</div>
+		<?php elseif ( 'error_issue_ca' === $message ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p>広告CAの発行に失敗しました。</p>
+			</div>
+		<?php endif; ?>
+
+		<?php if ( empty( $application ) ) : ?>
+			<div class="notice notice-error">
+				<p>対象の広告申込が見つかりません。</p>
+			</div>
+		<?php else : ?>
+			<h2>基本情報</h2>
+
+			<table class="form-table" role="presentation">
+				<tbody>
+					<tr>
+						<th scope="row">申込ID</th>
+						<td><?php echo esc_html( $application['id'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row">受付番号</th>
+						<td><?php echo esc_html( $application['application_code'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row">広告主名</th>
+						<td><?php echo esc_html( $application['advertiser_name_snapshot'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row">genre</th>
+						<td><?php echo esc_html( $application['genre'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row">広告枠</th>
+						<td>
+							<?php
+							echo esc_html(
+								( ! empty( $application['slot_name'] ) ? $application['slot_name'] : '未設定' ) .
+								' / ' .
+								( ! empty( $application['slot_code'] ) ? $application['slot_code'] : '-' )
+							);
+							?>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">掲載期間</th>
+						<td>
+							<?php
+							echo esc_html(
+								$application['start_date'] . ' ～ ' . $application['end_date']
+							);
+							?>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">単価</th>
+						<td>
+							<?php
+							echo esc_html(
+								$application['bid_type'] . ' / ' . $application['bid_price']
+							);
+							?>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">状態</th>
+						<td><?php echo esc_html( $application['status'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row">登録日時</th>
+						<td><?php echo esc_html( $application['created_at'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row">承認日時</th>
+						<td><?php echo esc_html( isset( $application['approved_at'] ) ? $application['approved_at'] : '' ); ?></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<h2>広告クリエイティブ</h2>
+
+			<?php if ( empty( $items ) ) : ?>
+				<p>広告クリエイティブは登録されていません。</p>
+			<?php else : ?>
+				<table class="widefat fixed striped">
+					<thead>
+						<tr>
+							<th>位置</th>
+							<th>見出し</th>
+							<th>画像</th>
+							<th>リンク先URL</th>
+							<th>CA状態</th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $items as $item ) : ?>
+							<tr>
+								<td><?php echo esc_html( $item['slot_position'] ); ?></td>
+								<td><?php echo esc_html( $item['headline'] ); ?></td>
+								<td>
+									<?php if ( ! empty( $item['image_url'] ) ) : ?>
+										<img
+											src="<?php echo esc_url( $item['image_url'] ); ?>"
+											alt="<?php echo esc_attr( $item['headline'] ); ?>"
+											style="max-width: 240px; height: auto; border: 1px solid #ddd; padding: 4px; background: #fff;"
+										>
+										<div style="margin-top: 6px; word-break: break-all; font-size: 12px; color: #666;">
+											<?php echo esc_html( $item['image_url'] ); ?>
+										</div>
+									<?php else : ?>
+										<span>-</span>
+									<?php endif; ?>
+								</td>
+								<td style="word-break: break-all;">
+									<?php if ( ! empty( $item['landing_url'] ) ) : ?>
+										<a href="<?php echo esc_url( $item['landing_url'] ); ?>" target="_blank" rel="noopener noreferrer">
+											<?php echo esc_html( $item['landing_url'] ); ?>
+										</a>
+									<?php else : ?>
+										<span>-</span>
+									<?php endif; ?>
+								</td>
+								<td><?php echo esc_html( $item['ca_status'] ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+
+			<p style="margin-top: 20px;">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=cam-ad-applications' ) ); ?>" class="button">申込一覧へ戻る</a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=cam-ad-approved' ) ); ?>" class="button">承認済広告へ戻る</a>
+			</p>
+		<?php endif; ?>
+		<?php if ( ! empty( $application ) && 'ready' === $application['status'] ) : ?>
+			<p style="margin-top: 20px;">
+				<a
+					href="<?php echo esc_url( wp_nonce_url( add_query_arg(
+						array(
+							'action'         => 'cam_ad_application_issue_ca',
+							'application_id' => $application['id'],
+						),
+						admin_url( 'admin-post.php' )
+					), 'cam_ad_application_issue_ca_' . $application['id'] ) ); ?>"
+					class="button button-primary"
+				>CA発行</a>
+			</p>
+		<?php endif; ?>
+	</div>
+	<?php
+}
+
+/** 広告統計ページ */
+function ad_stats_page() {
+	?>
+	<div class="wrap">
+		<h1>CA広告統計</h1>
+		<p>ここに広告統計画面を作成します。</p>
+	</div>
+	<?php
+}
+
+/**
+ * 広告枠を保存
+ */
+function handle_ad_slot_create() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	check_admin_referer( 'cam_ad_slot_create' );
+
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'cam_ad_slots';
+
+	$slot_code   = isset( $_POST['slot_code'] ) ? sanitize_text_field( wp_unslash( $_POST['slot_code'] ) ) : '';
+	$slot_name   = isset( $_POST['slot_name'] ) ? sanitize_text_field( wp_unslash( $_POST['slot_name'] ) ) : '';
+	$genre       = isset( $_POST['genre'] ) ? sanitize_text_field( wp_unslash( $_POST['genre'] ) ) : '';
+	$position = 'top';
+
+	$allowed_genres = array_keys( get_ad_slot_genre_options() );
+	if ( ! in_array( $genre, $allowed_genres, true ) ) {
+		$genre = '';
+	}
+
+	$page_type   = isset( $_POST['page_type'] ) ? sanitize_text_field( wp_unslash( $_POST['page_type'] ) ) : 'post';
+	$status      = isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : 'active';
+	$description = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+
+	if ( '' === $slot_code || '' === $slot_name || '' === $genre ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-slots',
+				'message' => 'error_required',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$allowed_page_types = array( 'post', 'page', 'archive' );
+	if ( ! in_array( $page_type, $allowed_page_types, true ) ) {
+		$page_type = 'post';
+	}
+
+	$allowed_statuses = array( 'active', 'inactive' );
+	if ( ! in_array( $status, $allowed_statuses, true ) ) {
+		$status = 'active';
+	}
+
+	$now = current_time( 'mysql' );
+
+	$inserted = $wpdb->insert(
+		$table,
+		array(
+			'slot_code'   => $slot_code,
+			'slot_name'   => $slot_name,
+			'genre'       => $genre,
+			'position'    => $position,
+			'page_type'   => $page_type,
+			'status'      => $status,
+			'description' => $description,
+			'created_at'  => $now,
+			'updated_at'  => $now,
+		),
+		array(
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+		)
+	);
+
+	if ( false === $inserted ) {
+		$message = false !== strpos( $wpdb->last_error, 'Duplicate entry' ) ? 'error_duplicate' : 'error_db';
+
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-slots',
+				'message' => $message,
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$redirect_url = add_query_arg(
+		array(
+			'page'    => 'cam-ad-slots',
+			'message' => 'created',
+		),
+		admin_url( 'admin.php' )
+	);
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+
+/**
+ * 広告枠一覧取得
+ *
+ * @return array
+ */
+function get_ad_slots() {
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'cam_ad_slots';
+
+	$sql = "SELECT id, slot_code, slot_name, genre, page_type, status, created_at
+			FROM {$table}
+			ORDER BY id DESC";
+
+	$results = $wpdb->get_results( $sql, ARRAY_A );
+
+	return is_array( $results ) ? $results : array();
+}
+
+/**
+ * 有効な広告枠一覧取得（select用）
+ *
+ * @return array
+ */
+function get_active_ad_slots_for_select() {
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'cam_ad_slots';
+
+	$sql = "SELECT id, slot_code, slot_name, genre
+			FROM {$table}
+			WHERE status = 'active'
+			ORDER BY id DESC";
+
+	$results = $wpdb->get_results( $sql, ARRAY_A );
+
+	return is_array( $results ) ? $results : array();
+}
+
+/**
+ * 広告申込一覧取得
+ *
+ * @return array
+ */
+function get_ad_applications() {
+	global $wpdb;
+
+	$applications_table = $wpdb->prefix . 'cam_ad_applications';
+	$slots_table        = $wpdb->prefix . 'cam_ad_slots';
+
+	$sql = "SELECT
+				a.id,
+				a.application_code,
+				a.advertiser_name_snapshot,
+				a.genre,
+				a.start_date,
+				a.end_date,
+				a.bid_type,
+				a.bid_price,
+				a.status,
+				a.created_at,
+				s.slot_name,
+				s.slot_code
+			FROM {$applications_table} a
+			LEFT JOIN {$slots_table} s
+				ON a.slot_id = s.id
+			ORDER BY a.id DESC";
+
+	$results = $wpdb->get_results( $sql, ARRAY_A );
+
+	return is_array( $results ) ? $results : array();
+}
+
+/**
+ * 承認済広告一覧取得
+ *
+ * @return array
+ */
+function get_approved_ad_applications() {
+	global $wpdb;
+
+	$applications_table = $wpdb->prefix . 'cam_ad_applications';
+	$slots_table        = $wpdb->prefix . 'cam_ad_slots';
+
+	$sql = "SELECT
+				a.id,
+				a.application_code,
+				a.advertiser_name_snapshot,
+				a.genre,
+				a.start_date,
+				a.end_date,
+				a.bid_type,
+				a.bid_price,
+				a.status,
+				a.approved_at,
+				a.created_at,
+				s.slot_name,
+				s.slot_code
+			FROM {$applications_table} a
+			LEFT JOIN {$slots_table} s
+				ON a.slot_id = s.id
+			WHERE a.status IN ('approved', 'ready')
+			ORDER BY a.id DESC";
+
+	$results = $wpdb->get_results( $sql, ARRAY_A );
+
+	return is_array( $results ) ? $results : array();
+}
+
+/**
+ * 広告申込ヘッダ取得
+ *
+ * @param int $application_id 申込ID
+ * @return array|null
+ */
+function get_ad_application_by_id( $application_id ) {
+	global $wpdb;
+
+	$applications_table = $wpdb->prefix . 'cam_ad_applications';
+	$slots_table        = $wpdb->prefix . 'cam_ad_slots';
+
+	$sql = $wpdb->prepare(
+		"SELECT
+			a.*,
+			s.slot_name,
+			s.slot_code
+		FROM {$applications_table} a
+		LEFT JOIN {$slots_table} s
+			ON a.slot_id = s.id
+		WHERE a.id = %d
+		LIMIT 1",
+		$application_id
+	);
+
+	$result = $wpdb->get_row( $sql, ARRAY_A );
+
+	return is_array( $result ) ? $result : null;
+}
+
+/**
+ * 広告申込アイテム取得
+ *
+ * @param int $application_id 申込ID
+ * @return array
+ */
+function get_ad_application_items( $application_id ) {
+	global $wpdb;
+
+	$items_table = $wpdb->prefix . 'cam_ad_application_items';
+
+	$sql = $wpdb->prepare(
+		"SELECT *
+		FROM {$items_table}
+		WHERE application_id = %d
+		ORDER BY id ASC",
+		$application_id
+	);
+
+	$results = $wpdb->get_results( $sql, ARRAY_A );
+
+	return is_array( $results ) ? $results : array();
+}
+
+/**
+ * 広告申込登録
+ */
+function handle_ad_application_create() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	check_admin_referer( 'cam_ad_application_create' );
+
+	global $wpdb;
+
+	$applications_table = $wpdb->prefix . 'cam_ad_applications';
+	$items_table        = $wpdb->prefix . 'cam_ad_application_items';
+	$slots_table        = $wpdb->prefix . 'cam_ad_slots';
+
+	$advertiser_name = isset( $_POST['advertiser_name'] ) ? sanitize_text_field( wp_unslash( $_POST['advertiser_name'] ) ) : '';
+	$genre           = isset( $_POST['genre'] ) ? sanitize_text_field( wp_unslash( $_POST['genre'] ) ) : '';
+	$slot_id         = isset( $_POST['slot_id'] ) ? absint( $_POST['slot_id'] ) : 0;
+
+	$allowed_genres = array_keys( get_ad_slot_genre_options() );
+	if ( ! in_array( $genre, $allowed_genres, true ) ) {
+		$genre = '';
+	}
+
+	$start_date      = isset( $_POST['start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['start_date'] ) ) : '';
+	$end_date        = isset( $_POST['end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['end_date'] ) ) : '';
+	$bid_type        = isset( $_POST['bid_type'] ) ? sanitize_text_field( wp_unslash( $_POST['bid_type'] ) ) : 'fixed';
+	$bid_price       = isset( $_POST['bid_price'] ) ? (float) $_POST['bid_price'] : 0;
+
+	if ( '' === $advertiser_name || '' === $genre || 0 === $slot_id || '' === $start_date || '' === $end_date ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_required',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	if ( ! strtotime( $start_date ) || ! strtotime( $end_date ) || strtotime( $start_date ) > strtotime( $end_date ) ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_date',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$slot_exists = $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT id FROM {$slots_table} WHERE id = %d",
+			$slot_id
+		)
+	);
+
+	if ( ! $slot_exists ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_slot',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$slot_genre = $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT genre FROM {$slots_table} WHERE id = %d LIMIT 1",
+			$slot_id
+		)
+	);
+
+	if ( empty( $slot_genre ) || $slot_genre !== $genre ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_genre_mismatch',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$allowed_bid_types = array( 'fixed', 'cpm', 'cpc' );
+	if ( ! in_array( $bid_type, $allowed_bid_types, true ) ) {
+		$bid_type = 'fixed';
+	}
+
+	$application_code = 'cam-app-' . wp_generate_uuid4();
+	$now              = current_time( 'mysql' );
+
+	$inserted = $wpdb->insert(
+		$applications_table,
+		array(
+			'application_code'         => $application_code,
+			'advertiser_id'            => null,
+			'applicant_type'           => 'advertiser',
+			'advertiser_name_snapshot' => $advertiser_name,
+			'contact_name_snapshot'    => '',
+			'email_snapshot'           => '',
+			'phone_snapshot'           => '',
+			'address_snapshot'         => '',
+			'genre'                    => $genre,
+			'slot_id'                  => $slot_id,
+			'start_date'               => $start_date,
+			'end_date'                 => $end_date,
+			'bid_type'                 => $bid_type,
+			'bid_price'                => $bid_price,
+			'status'                   => 'pending',
+			'review_comment'           => '',
+			'admin_memo'               => '',
+			'created_at'               => $now,
+			'updated_at'               => $now,
+		),
+		array(
+			'%s',
+			'%d',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%d',
+			'%s',
+			'%s',
+			'%s',
+			'%f',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+			'%s',
+		)
+	);
+
+	if ( false === $inserted ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_db',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$application_id = (int) $wpdb->insert_id;
+
+	$items = array(
+		'top'    => array(
+			'headline'    => isset( $_POST['top_headline'] ) ? sanitize_text_field( wp_unslash( $_POST['top_headline'] ) ) : '',
+			'image_url'   => isset( $_POST['top_image_url'] ) ? esc_url_raw( wp_unslash( $_POST['top_image_url'] ) ) : '',
+			'landing_url' => isset( $_POST['top_landing_url'] ) ? esc_url_raw( wp_unslash( $_POST['top_landing_url'] ) ) : '',
+		),
+		'middle' => array(
+			'headline'    => isset( $_POST['middle_headline'] ) ? sanitize_text_field( wp_unslash( $_POST['middle_headline'] ) ) : '',
+			'image_url'   => isset( $_POST['middle_image_url'] ) ? esc_url_raw( wp_unslash( $_POST['middle_image_url'] ) ) : '',
+			'landing_url' => isset( $_POST['middle_landing_url'] ) ? esc_url_raw( wp_unslash( $_POST['middle_landing_url'] ) ) : '',
+		),
+		'bottom' => array(
+			'headline'    => isset( $_POST['bottom_headline'] ) ? sanitize_text_field( wp_unslash( $_POST['bottom_headline'] ) ) : '',
+			'image_url'   => isset( $_POST['bottom_image_url'] ) ? esc_url_raw( wp_unslash( $_POST['bottom_image_url'] ) ) : '',
+			'landing_url' => isset( $_POST['bottom_landing_url'] ) ? esc_url_raw( wp_unslash( $_POST['bottom_landing_url'] ) ) : '',
+		),
+	);
+
+	foreach ( $items as $position => $item ) {
+		if ( '' === $item['headline'] && '' === $item['image_url'] && '' === $item['landing_url'] ) {
+			continue;
+		}
+
+		$wpdb->insert(
+			$items_table,
+			array(
+				'application_id' => $application_id,
+				'slot_position'  => $position,
+				'headline'       => $item['headline'],
+				'body_text'      => '',
+				'image_url'      => $item['image_url'],
+				'attachment_id'  => null,
+				'landing_url'    => $item['landing_url'],
+				'ca_status'      => 'not_issued',
+				'ca_identifier'  => '',
+				'item_status'    => 'pending',
+				'display_order'  => 0,
+				'created_at'     => $now,
+				'updated_at'     => $now,
+			),
+			array(
+				'%d',
+				'%s',
+				'%s',
+				'%s',
+				'%s',
+				'%d',
+				'%s',
+				'%s',
+				'%s',
+				'%s',
+				'%d',
+				'%s',
+				'%s',
+			)
+		);
+	}
+
+	$redirect_url = add_query_arg(
+		array(
+			'page'    => 'cam-ad-applications',
+			'message' => 'created',
+		),
+		admin_url( 'admin.php' )
+	);
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+/**
+ * 広告枠を無効化
+ */
+function handle_ad_slot_deactivate() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	$slot_id = isset( $_GET['slot_id'] ) ? absint( $_GET['slot_id'] ) : 0;
+
+	check_admin_referer( 'cam_ad_slot_deactivate_' . $slot_id );
+
+	if ( ! $slot_id ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-slots',
+				'message' => 'error_invalid_slot',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'cam_ad_slots';
+
+	$updated = $wpdb->update(
+		$table,
+		array(
+			'status'     => 'inactive',
+			'updated_at' => current_time( 'mysql' ),
+		),
+		array(
+			'id' => $slot_id,
+		),
+		array(
+			'%s',
+			'%s',
+		),
+		array(
+			'%d',
+		)
+	);
+
+	if ( false === $updated ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-slots',
+				'message' => 'error_db',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$redirect_url = add_query_arg(
+		array(
+			'page'    => 'cam-ad-slots',
+			'message' => 'deactivated',
+		),
+		admin_url( 'admin.php' )
+	);
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+/**
+ * 広告申込を承認
+ */
+function handle_ad_application_approve() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	$application_id = isset( $_GET['application_id'] ) ? absint( $_GET['application_id'] ) : 0;
+
+	check_admin_referer( 'cam_ad_application_approve_' . $application_id );
+
+	if ( ! $application_id ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_invalid_application',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'cam_ad_applications';
+
+	$updated = $wpdb->update(
+		$table,
+		array(
+			'status'      => 'approved',
+			'approved_at' => current_time( 'mysql' ),
+			'reviewed_at' => current_time( 'mysql' ),
+			'reviewed_by' => get_current_user_id(),
+			'updated_at'  => current_time( 'mysql' ),
+		),
+		array(
+			'id' => $application_id,
+		),
+		array(
+			'%s',
+			'%s',
+			'%s',
+			'%d',
+			'%s',
+		),
+		array(
+			'%d',
+		)
+	);
+
+	if ( false === $updated ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_db',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$redirect_url = add_query_arg(
+		array(
+			'page'    => 'cam-ad-applications',
+			'message' => 'approved',
+		),
+		admin_url( 'admin.php' )
+	);
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+
+/**
+ * 広告申込を却下
+ */
+function handle_ad_application_reject() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	$application_id = isset( $_GET['application_id'] ) ? absint( $_GET['application_id'] ) : 0;
+
+	check_admin_referer( 'cam_ad_application_reject_' . $application_id );
+
+	if ( ! $application_id ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_invalid_application',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'cam_ad_applications';
+
+	$updated = $wpdb->update(
+		$table,
+		array(
+			'status'      => 'rejected',
+			'reviewed_at' => current_time( 'mysql' ),
+			'reviewed_by' => get_current_user_id(),
+			'updated_at'  => current_time( 'mysql' ),
+		),
+		array(
+			'id' => $application_id,
+		),
+		array(
+			'%s',
+			'%s',
+			'%d',
+			'%s',
+		),
+		array(
+			'%d',
+		)
+	);
+
+	if ( false === $updated ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-applications',
+				'message' => 'error_db',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$redirect_url = add_query_arg(
+		array(
+			'page'    => 'cam-ad-applications',
+			'message' => 'rejected',
+		),
+		admin_url( 'admin.php' )
+	);
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+
+/**
+ * 広告申込を配信対象化
+ */
+function handle_ad_application_ready() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	$application_id = isset( $_GET['application_id'] ) ? absint( $_GET['application_id'] ) : 0;
+
+	check_admin_referer( 'cam_ad_application_ready_' . $application_id );
+
+	if ( ! $application_id ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-approved',
+				'message' => 'error_invalid_application',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	global $wpdb;
+
+	$table = $wpdb->prefix . 'cam_ad_applications';
+
+	$updated = $wpdb->update(
+		$table,
+		array(
+			'status'     => 'ready',
+			'updated_at' => current_time( 'mysql' ),
+		),
+		array(
+			'id'     => $application_id,
+			'status' => 'approved',
+		),
+		array(
+			'%s',
+			'%s',
+		),
+		array(
+			'%d',
+			'%s',
+		)
+	);
+
+	if ( false === $updated ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-approved',
+				'message' => 'error_db',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$redirect_url = add_query_arg(
+		array(
+			'page'    => 'cam-ad-approved',
+			'message' => 'ready',
+		),
+		admin_url( 'admin.php' )
+	);
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+
+/**
+ * 広告申込のCA発行
+ */
+function handle_ad_application_issue_ca() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	$application_id = isset( $_GET['application_id'] ) ? absint( $_GET['application_id'] ) : 0;
+
+	check_admin_referer( 'cam_ad_application_issue_ca_' . $application_id );
+
+	if ( ! $application_id ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-application-detail',
+				'message' => 'error_issue_ca',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	global $wpdb;
+
+	$applications_table = $wpdb->prefix . 'cam_ad_applications';
+	$items_table        = $wpdb->prefix . 'cam_ad_application_items';
+
+	$application = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT * FROM {$applications_table} WHERE id = %d LIMIT 1",
+			$application_id
+		),
+		ARRAY_A
+	);
+
+	if ( empty( $application ) || 'ready' !== $application['status'] ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'           => 'cam-ad-application-detail',
+				'application_id' => $application_id,
+				'message'        => 'error_not_ready',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$items = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT * FROM {$items_table} WHERE application_id = %d ORDER BY id ASC",
+			$application_id
+		),
+		ARRAY_A
+	);
+
+	if ( empty( $items ) ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'           => 'cam-ad-application-detail',
+				'application_id' => $application_id,
+				'message'        => 'error_no_items',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	foreach ( $items as $item ) {
+		$updated = $wpdb->update(
+			$items_table,
+			array(
+				'ca_status'     => 'issued',
+				'ca_identifier' => 'cam-ad-ca-' . $application_id . '-' . $item['id'],
+				'updated_at'    => current_time( 'mysql' ),
+			),
+			array(
+				'id' => $item['id'],
+			),
+			array(
+				'%s',
+				'%s',
+				'%s',
+			),
+			array(
+				'%d',
+			)
+		);
+
+		if ( false === $updated ) {
+			$redirect_url = add_query_arg(
+				array(
+					'page'           => 'cam-ad-application-detail',
+					'application_id' => $application_id,
+					'message'        => 'error_issue_ca',
+				),
+				admin_url( 'admin.php' )
+			);
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+	}
+
+	$redirect_url = add_query_arg(
+		array(
+			'page'           => 'cam-ad-application-detail',
+			'application_id' => $application_id,
+			'message'        => 'ca_issued',
+		),
+		admin_url( 'admin.php' )
+	);
+	wp_safe_redirect( $redirect_url );
+	exit;
+}
+
+/**
+ * 掲載先候補の投稿一覧取得
+ *
+ * @return array
+ */
+function get_ad_assignable_posts() {
+	$posts = get_posts(
+		array(
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'posts_per_page' => 50,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		)
+	);
+
+	return is_array( $posts ) ? $posts : array();
+}
+
+/**
+ * 広告申込を投稿に割り当て
+ */
+function handle_ad_application_assign_post() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( '権限がありません。' );
+	}
+
+	$application_id = isset( $_POST['application_id'] ) ? absint( wp_unslash( $_POST['application_id'] ) ) : 0;
+	$post_id        = isset( $_POST['post_id'] ) ? absint( wp_unslash( $_POST['post_id'] ) ) : 0;
+
+	check_admin_referer( 'cam_ad_application_assign_post_' . $application_id );
+
+	if ( ! $application_id || ! $post_id ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-approved',
+				'message' => 'error_assign_required',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	global $wpdb;
+
+	$applications_table = $wpdb->prefix . 'cam_ad_applications';
+
+	$application = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT * FROM {$applications_table} WHERE id = %d LIMIT 1",
+			$application_id
+		),
+		ARRAY_A
+	);
+
+	if ( empty( $application ) || 'ready' !== $application['status'] ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-approved',
+				'message' => 'error_invalid_application',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$post = get_post( $post_id );
+	if ( ! $post instanceof \WP_Post ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-approved',
+				'message' => 'error_invalid_post',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	update_post_meta( $post_id, '_cam_assigned_ad_application_id', $application_id );
+
+	$redirect_url = add_query_arg(
+		array(
+			'post'   => $post_id,
+			'action' => 'edit',
+		),
+		admin_url( 'post.php' )
+	);
+
+	wp_safe_redirect( $redirect_url );
+	exit;
 }

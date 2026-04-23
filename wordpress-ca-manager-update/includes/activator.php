@@ -28,6 +28,8 @@ function ca_manager_activate() {
 		}
 	}
 
+	\Profile\Ad\DB::install();
+
 	// index.php
 	$index_file = $dir . 'index.php';
 	if ( ! $wp_filesystem->exists( $index_file ) ) {
