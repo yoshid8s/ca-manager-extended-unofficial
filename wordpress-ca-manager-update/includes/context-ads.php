@@ -21,25 +21,26 @@ function cam_get_context_ads() {
  * @return array|null
  */
 function cam_get_context_ad_for_post( $post_id ) {
-	$post_id = (int) $post_id;
-	if ( $post_id <= 0 ) {
-		return null;
-	}
-
 	$genre = get_post_meta( $post_id, '_cam_genre', true );
-	$genre = is_string( $genre ) ? trim( $genre ) : '';
 
 	if ( '' === $genre ) {
 		return null;
 	}
 
-	$ads = cam_get_context_ads();
-	if ( ! is_array( $ads ) || empty( $ads ) ) {
-		return null;
+	$post = get_post( $post_id );
+
+	$post_text = '';
+	if ( $post instanceof \WP_Post ) {
+		$post_text = strtolower(
+			wp_strip_all_tags(
+				(string) $post->post_title . ' ' . (string) $post->post_content
+			)
+		);
 	}
 
-	$today      = current_time( 'Y-m-d' );
+	$ads        = cam_get_context_ads();
 	$candidates = array();
+	$today      = current_time( 'Y-m-d' );
 
 	foreach ( $ads as $ad ) {
 		$enabled    = ! empty( $ad['enabled'] );
@@ -60,59 +61,55 @@ function cam_get_context_ad_for_post( $post_id ) {
 			continue;
 		}
 
-		$candidates[] = $ad;
+		$score      = 0;
+		$advertiser = isset( $ad['advertiser'] ) ? strtolower( (string) $ad['advertiser'] ) : '';
+
+		if ( '' !== $advertiser && '' !== $post_text && false !== strpos( $post_text, $advertiser ) ) {
+			$score += 100;
+		}
+
+		$ad['_match_score'] = $score;
+		$candidates[]       = $ad;
 	}
 
 	if ( empty( $candidates ) ) {
 		return null;
 	}
 
-	$post = get_post( $post_id );
+	usort(
+		$candidates,
+		function ( $a, $b ) {
+			$score_a = isset( $a['_match_score'] ) ? (int) $a['_match_score'] : 0;
+			$score_b = isset( $b['_match_score'] ) ? (int) $b['_match_score'] : 0;
 
-	$title   = '';
-	$excerpt = '';
-
-	if ( $post instanceof \WP_Post ) {
-		$title   = is_string( $post->post_title ) ? $post->post_title : '';
-		$excerpt = is_string( $post->post_excerpt ) ? $post->post_excerpt : '';
-	}
-
-	$match_text = trim( $title . ' ' . $excerpt );
-	$priority_ads = array();
-
-	if ( '' !== $match_text && function_exists( 'mb_stripos' ) ) {
-		foreach ( $candidates as $ad ) {
-			$advertiser = isset( $ad['advertiser'] ) ? trim( (string) $ad['advertiser'] ) : '';
-
-			if ( '' === $advertiser ) {
-				continue;
-			}
-
-			if ( false !== mb_stripos( $match_text, $advertiser, 0, 'UTF-8' ) ) {
-				$priority_ads[] = $ad;
-			}
+			return $score_b <=> $score_a;
 		}
-	} elseif ( '' !== $match_text ) {
-		$match_text_lower = strtolower( $match_text );
+	);
 
-		foreach ( $candidates as $ad ) {
-			$advertiser = isset( $ad['advertiser'] ) ? trim( (string) $ad['advertiser'] ) : '';
 
-			if ( '' === $advertiser ) {
-				continue;
-			}
+    if ( function_exists( '\Profile\Debug\debug' ) ) {
+	    \Profile\Debug\debug(
+		    'AD_SELECT_CANDIDATES post_id=' . $post_id . ' ' .
+		    wp_json_encode(
+			    array_map(
+			    	function ( $ad ) {
+				    	return array(
+				    		'id'         => isset( $ad['id'] ) ? $ad['id'] : '',
+				    		'advertiser' => isset( $ad['advertiser'] ) ? $ad['advertiser'] : '',
+				    		'genre'      => isset( $ad['genre'] ) ? $ad['genre'] : '',
+				    		'score'      => isset( $ad['_match_score'] ) ? $ad['_match_score'] : 0,
+				    		'enabled'    => isset( $ad['enabled'] ) ? $ad['enabled'] : '',
+				    		'status'     => isset( $ad['status'] ) ? $ad['status'] : '',
+				    	);
+				    },
+				    $candidates
+			    ),
+			    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+		    )
+	    );
+    }
 
-			if ( false !== strpos( $match_text_lower, strtolower( $advertiser ) ) ) {
-				$priority_ads[] = $ad;
-			}
-		}
-	}
-
-	$pool = ! empty( $priority_ads ) ? $priority_ads : $candidates;
-
-	$index = $post_id % count( $pool );
-
-	return isset( $pool[ $index ] ) ? $pool[ $index ] : $pool[0];
+	return $candidates[0];
 }
 
 /**

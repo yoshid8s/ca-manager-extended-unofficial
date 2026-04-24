@@ -4,6 +4,7 @@
 namespace Profile\Admin;
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/admin-ad-menus.php';
 use const Profile\Config\PROFILE_DEFAULT_CA_SERVER_HOSTNAME;
 use const Profile\Config\PROFILE_DEFAULT_CA_TARGET_TYPE;
 use const Profile\Config\PROFILE_DEFAULT_CA_TARGET_CSS_SELECTOR;
@@ -42,11 +43,30 @@ function init() {
 				wp_die( 'ログファイルが存在しません。' );
 			}
 
-			$contents      = $wp_filesystem->get_contents( $log_file );
-			$contents_safe = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F]+/', '', $contents );
-			if ( false === $contents_safe ) {
+			$contents = $wp_filesystem->get_contents( $log_file );
+
+			if ( false === $contents || null === $contents ) {
 				wp_die( 'ログファイルを読み込めませんでした。' );
 			}
+
+			$contents_safe = preg_replace(
+				'/[\x00-\x08\x0B\x0C\x0E-\x1F]+/',
+				'',
+				(string) $contents
+			);
+
+			if ( false === $contents_safe || null === $contents_safe ) {
+				wp_die( 'ログの整形に失敗しました。' );
+			}
+
+
+			if ( function_exists( 'ob_get_level' ) ) {
+				while ( ob_get_level() > 0 ) {
+					ob_end_clean();
+				}
+			}
+			nocache_headers();
+
 			header( 'Content-Type: application/octet-stream' );
 			header( 'Content-Disposition: attachment; filename="ca-manager-debug.log"' );
 			header( 'Content-Length: ' . strlen( $contents_safe ) );
@@ -94,50 +114,7 @@ function add_ad_options_pages() {
 	);
 
 	// ★ これを追加（親と同じスラッグ）
-	\add_submenu_page(
-		'cam-ad-main',
-		'CA広告管理',
-		'CA広告管理',
-		'manage_options',
-		'cam-ad-main',
-		'\Profile\Admin\ad_applications_page'
-	);
 
-	\add_submenu_page(
-		'cam-ad-main',
-		'広告枠設定',
-		'広告枠設定',
-		'manage_options',
-		'cam-ad-slots',
-		'\Profile\Admin\ad_slots_page'
-	);
-
-	\add_submenu_page(
-		'cam-ad-main',
-		'広告申込一覧',
-		'広告申込一覧',
-		'manage_options',
-		'cam-ad-applications',
-		'\Profile\Admin\ad_applications_page'
-	);
-
-	\add_submenu_page(
-		'cam-ad-main',
-		'承認済広告',
-		'承認済広告',
-		'manage_options',
-		'cam-ad-approved',
-		'\Profile\Admin\ad_approved_page'
-	);
-
-	\add_submenu_page(
-		'cam-ad-main',
-		'広告統計',
-		'広告統計',
-		'manage_options',
-		'cam-ad-stats',
-		'\Profile\Admin\ad_stats_page'
-	);
 	\add_submenu_page(
 		null,
 		'広告申込詳細',
@@ -167,7 +144,6 @@ function register_settings() {
 	\add_settings_field( 'profile_ca_target_html', '検証対象要素の存在するHTML', '\Profile\Admin\profile_ca_target_html_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_embedded_or_external', 'CA Presentation Type', '\Profile\Admin\profile_ca_embedded_or_external_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_log_option', 'ログの出力設定', '\Profile\Admin\profile_ca_log_option_field', 'ca-manager', 'profile_settings' );
-	\register_setting( 'ca-manager', 'cam_context_ads' );
 }
 
 /** 設定画面 */
@@ -862,7 +838,7 @@ function cam_context_ads_settings_block() {
 
 	<hr>
 
-	<h3>設定済み広告情報</h3>
+	<h3 id="cam-context-ads">設定済み広告情報</h3>
 	<p>以下は登録済みのコンテキスト広告です。</p>
 
 	<?php if ( empty( $ads ) ) : ?>

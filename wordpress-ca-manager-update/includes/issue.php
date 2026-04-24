@@ -2168,13 +2168,18 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 			);
 		}
 
+		$has_assigned_ad_shortcode =
+			false !== strpos( $content, '[cam_assigned_ad_top]' ) ||
+			false !== strpos( $content, '[cam_assigned_ad_middle]' ) ||
+			false !== strpos( $content, '[cam_assigned_ad_bottom]' );
+
 		$content = \apply_filters( 'the_content', $content );
+
 		debug( 'create_uca_list after the_content filter, page=' . $page );
 
 		/** 広告CA挿入 **/
 
 		$ad_html_for_ca = '';
-
 		if ( \function_exists( '\cam_get_top_ad_html' ) ) {
 			$ad_html_for_ca = \cam_get_top_ad_html( $post->ID );
 		}
@@ -2185,6 +2190,51 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 		} else {
 			$content = str_replace( '[cam_ad_top]', '', $content );
 			debug( 'create_uca_list removed [cam_ad_top] because ad html empty, page=' . $page );
+		}
+
+		debug(
+			'ASSIGNED_RENDER_EXISTS=' .
+			( \function_exists( '\Profile\FrontAssignedAd\render_assigned_ad_by_position' ) ? 'yes' : 'no' ) .
+			', post_id=' . $post->ID
+		);
+
+		$assigned_top_html = '';
+		if ( \function_exists( '\Profile\FrontAssignedAd\render_assigned_ad_by_position' ) ) {
+			$assigned_top_html = \Profile\FrontAssignedAd\render_assigned_ad_by_position( $post->ID, 'top' );
+		}
+
+		if ( '' !== $assigned_top_html ) {
+			$content = str_replace( '[cam_assigned_ad_top]', $assigned_top_html, $content );
+			debug( 'create_uca_list replaced [cam_assigned_ad_top] with assigned ad html, page=' . $page );
+		} else {
+			$content = str_replace( '[cam_assigned_ad_top]', '', $content );
+			debug( 'create_uca_list removed [cam_assigned_ad_top] because assigned ad html empty, page=' . $page );
+		}
+
+		$assigned_middle_html = '';
+		if ( \function_exists( '\Profile\FrontAssignedAd\render_assigned_ad_by_position' ) ) {
+			$assigned_middle_html = \Profile\FrontAssignedAd\render_assigned_ad_by_position( $post->ID, 'middle' );
+		}
+
+		if ( '' !== $assigned_middle_html ) {
+			$content = str_replace( '[cam_assigned_ad_middle]', $assigned_middle_html, $content );
+			debug( 'create_uca_list replaced [cam_assigned_ad_middle] with assigned ad html, page=' . $page );
+		} else {
+			$content = str_replace( '[cam_assigned_ad_middle]', '', $content );
+			debug( 'create_uca_list removed [cam_assigned_ad_middle] because assigned ad html empty, page=' . $page );
+		}
+
+		$assigned_bottom_html = '';
+		if ( \function_exists( '\Profile\FrontAssignedAd\render_assigned_ad_by_position' ) ) {
+			$assigned_bottom_html = \Profile\FrontAssignedAd\render_assigned_ad_by_position( $post->ID, 'bottom' );
+		}
+
+		if ( '' !== $assigned_bottom_html ) {
+			$content = str_replace( '[cam_assigned_ad_bottom]', $assigned_bottom_html, $content );
+			debug( 'create_uca_list replaced [cam_assigned_ad_bottom] with assigned ad html, page=' . $page );
+		} else {
+			$content = str_replace( '[cam_assigned_ad_bottom]', '', $content );
+			debug( 'create_uca_list removed [cam_assigned_ad_bottom] because assigned ad html empty, page=' . $page );
 		}
 
 		/** 広告CA挿入ここまで **/		
@@ -2585,7 +2635,7 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 		}
 
 		// 投稿個別広告が無いときだけ、genre一致のコンテキスト広告を広告CA化
-		if ( ! $has_post_specific_ad ) {
+		if ( ! $has_post_specific_ad && ! $has_assigned_ad_shortcode ) {
 			$placements = array( 'top', 'middle', 'bottom' );
 
 			foreach ( $placements as $placement ) {

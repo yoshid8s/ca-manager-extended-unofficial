@@ -286,6 +286,26 @@ function cam_context_ad_bottom_shortcode() {
 }
 add_shortcode( 'cam_context_ad_bottom', 'cam_context_ad_bottom_shortcode' );
 
+add_filter( 'the_content', 'cam_restore_context_ad_shortcodes', 5 );
+
+function cam_restore_context_ad_shortcodes( $content ) {
+	$patterns = array(
+		'cam_context_ad_top',
+		'cam_context_ad_middle',
+		'cam_context_ad_bottom',
+	);
+
+	foreach ( $patterns as $p ) {
+		$content = preg_replace(
+			'/<p[^>]*>\s*' . preg_quote( $p, '/' ) . '\s*<\/p>/',
+			'[' . $p . ']',
+			$content
+		);
+	}
+
+	return $content;
+}
+
 /**
  * bottom 到達ログ用スクリプト
  */

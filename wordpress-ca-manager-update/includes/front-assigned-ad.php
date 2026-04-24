@@ -10,6 +10,10 @@ namespace Profile\FrontAssignedAd;
  */
 function init() {
 	\add_filter( 'the_content', __NAMESPACE__ . '\\inject_assigned_ad_into_content', 20 );
+
+	\add_shortcode( 'cam_assigned_ad_top', __NAMESPACE__ . '\\assigned_ad_top_shortcode' );
+	\add_shortcode( 'cam_assigned_ad_middle', __NAMESPACE__ . '\\assigned_ad_middle_shortcode' );
+	\add_shortcode( 'cam_assigned_ad_bottom', __NAMESPACE__ . '\\assigned_ad_bottom_shortcode' );
 }
 
 /**
@@ -31,8 +35,13 @@ function get_assigned_application_id( $post_id ) {
 function get_assigned_ad_data( $post_id ) {
 	global $wpdb;
 
+	error_log( 'ASSIGNED start post_id=' . $post_id );
+
 	$application_id = get_assigned_application_id( $post_id );
+	error_log( 'ASSIGNED application_id=' . print_r( $application_id, true ) );
+
 	if ( ! $application_id ) {
+		error_log( 'ASSIGNED return null: no application_id' );
 		return null;
 	}
 
@@ -46,12 +55,15 @@ function get_assigned_ad_data( $post_id ) {
 		),
 		ARRAY_A
 	);
+	error_log( 'ASSIGNED application=' . print_r( $application, true ) );
 
 	if ( empty( $application ) || ! is_array( $application ) ) {
+		error_log( 'ASSIGNED return null: application empty' );
 		return null;
 	}
 
 	if ( 'ready' !== $application['status'] && 'approved' !== $application['status'] ) {
+		error_log( 'ASSIGNED return null: status=' . $application['status'] );
 		return null;
 	}
 
@@ -62,8 +74,10 @@ function get_assigned_ad_data( $post_id ) {
 		),
 		ARRAY_A
 	);
+	error_log( 'ASSIGNED items=' . print_r( $items, true ) );
 
 	if ( ! is_array( $items ) || empty( $items ) ) {
+		error_log( 'ASSIGNED return null: items empty' );
 		return null;
 	}
 
@@ -78,10 +92,14 @@ function get_assigned_ad_data( $post_id ) {
 			continue;
 		}
 
+		error_log( 'ASSIGNED slot_position=' . $item['slot_position'] );
+
 		if ( isset( $grouped[ $item['slot_position'] ] ) ) {
 			$grouped[ $item['slot_position'] ] = $item;
 		}
 	}
+
+	error_log( 'ASSIGNED grouped=' . print_r( $grouped, true ) );
 
 	return array(
 		'application' => $application,
@@ -110,7 +128,7 @@ function render_ad_item( $item, $position, $post_id ) {
 		return '';
 	}
 
-	$wrapper_id = 'cam-assigned-ad-' . (int) $post_id . '-' . \sanitize_html_class( $position );
+	$wrapper_id = 'cam-assigned-ad-' . \sanitize_html_class( $position ) . '-' . (int) $post_id;
 
 	ob_start();
 	?>
@@ -184,4 +202,86 @@ function inject_assigned_ad_into_content( $content ) {
 	}
 
 	return $top_ad . $content . $bottom_ad;
+}
+
+/**
+ * 指定位置の割当広告HTMLを返す
+ *
+ * @param int    $post_id 投稿ID
+ * @param string $position top|middle|bottom
+ * @return string
+ */
+function render_assigned_ad_by_position( $post_id, $position ) {
+	$post_id  = (int) $post_id;
+	$position = (string) $position;
+
+	if ( ! $post_id || '' === $position ) {
+		return '';
+	}
+
+	$assigned = get_assigned_ad_data( $post_id );
+
+	if (
+		! is_array( $assigned ) ||
+		empty( $assigned['items'][ $position ] ) ||
+		! is_array( $assigned['items'][ $position ] )
+	) {
+		return '';
+	}
+
+	return render_ad_item( $assigned['items'][ $position ], $position, $post_id );
+}
+
+/**
+ * 割当広告 shortcode: top
+ *
+ * @return string
+ */
+function assigned_ad_top_shortcode() {
+	if ( \is_admin() ) {
+		return '';
+	}
+
+	$post_id = \get_the_ID();
+	if ( ! $post_id ) {
+		return '';
+	}
+
+	return render_assigned_ad_by_position( $post_id, 'top' );
+}
+
+/**
+ * 割当広告 shortcode: middle
+ *
+ * @return string
+ */
+function assigned_ad_middle_shortcode() {
+	if ( \is_admin() ) {
+		return '';
+	}
+
+	$post_id = \get_the_ID();
+	if ( ! $post_id ) {
+		return '';
+	}
+
+	return render_assigned_ad_by_position( $post_id, 'middle' );
+}
+
+/**
+ * 割当広告 shortcode: bottom
+ *
+ * @return string
+ */
+function assigned_ad_bottom_shortcode() {
+	if ( \is_admin() ) {
+		return '';
+	}
+
+	$post_id = \get_the_ID();
+	if ( ! $post_id ) {
+		return '';
+	}
+
+	return render_assigned_ad_by_position( $post_id, 'bottom' );
 }
