@@ -1132,7 +1132,7 @@ function ad_applications_page() {
 			</div>
 		<?php elseif ( 'error_required' === $message ) : ?>
 			<div class="notice notice-error is-dismissible">
-				<p>広告主名・genre・広告枠・掲載開始日・掲載終了日は必須です。</p>
+				<p>広告主名・genre・広告枠は必須です。</p>
 			</div>
 		<?php elseif ( 'error_slot' === $message ) : ?>
 			<div class="notice notice-error is-dismissible">
@@ -2061,7 +2061,7 @@ function handle_ad_application_create() {
 	$bid_type        = isset( $_POST['bid_type'] ) ? sanitize_text_field( wp_unslash( $_POST['bid_type'] ) ) : 'fixed';
 	$bid_price       = isset( $_POST['bid_price'] ) ? (float) $_POST['bid_price'] : 0;
 
-	if ( '' === $advertiser_name || '' === $genre || 0 === $slot_id || '' === $start_date || '' === $end_date ) {
+	if ( '' === $advertiser_name || '' === $genre || 0 === $slot_id ) {
 		$redirect_url = add_query_arg(
 			array(
 				'page'    => 'cam-ad-applications',
@@ -2073,11 +2073,15 @@ function handle_ad_application_create() {
 		exit;
 	}
 
-	if ( ! strtotime( $start_date ) || ! strtotime( $end_date ) || strtotime( $start_date ) > strtotime( $end_date ) ) {
+	if (
+		( '' !== $start_date && ! strtotime( $start_date ) ) ||
+		( '' !== $end_date && ! strtotime( $end_date ) ) ||
+		( '' !== $start_date && '' !== $end_date && strtotime( $start_date ) > strtotime( $end_date ) )
+	) {
 		$redirect_url = add_query_arg(
 			array(
-				'page'    => 'cam-ad-applications',
-				'message' => 'error_date',
+				'page'    => 'cam-ad-approved',
+				'message' => 'approved',
 			),
 			admin_url( 'admin.php' )
 		);
@@ -2393,7 +2397,7 @@ function handle_ad_application_approve() {
 
 	$redirect_url = add_query_arg(
 		array(
-			'page'    => 'cam-ad-applications',
+			'page'    => 'cam-ad-approved',
 			'message' => 'approved',
 		),
 		admin_url( 'admin.php' )
