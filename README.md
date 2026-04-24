@@ -23,12 +23,22 @@ WordPress上での実運用を想定して拡張した実装です。
 
 最新版は [Releases](https://github.com/yoshid8s/ca-manager-extension/releases) からダウンロードできます。
 
+## CA Manager Extension の適用範囲拡張バージョン：CAメタデータ連動広告管理（プロトタイプ）
+
+v0.4.6-1では、Content Attestation（CA）のメタデータを活用した
+コンテキスト広告管理機能（初期開発版）を追加しました。
+
+詳しくは以下のリリースをご覧ください。
+
+- https://github.com/yoshid8s/ca-manager-extension/releases/tag/v0.4.6-1
+
 ## 主な機能
 - 投稿単位でのCA管理
 - 広告CA（OnlineAd）
 - 埋め込みコンテンツCA
 - 記事CAの一括発行機能
 - 複数記事に対するCA発行
+- コンテキスト広告管理機能
 - UIイメージ例（下図）
 
 ## 管理画面（設定・一括発行）
