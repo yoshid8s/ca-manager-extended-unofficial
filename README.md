@@ -28,6 +28,8 @@ WordPress上での実運用を想定して拡張した実装です。
 v0.4.6-1では、Content Attestation（CA）のメタデータを活用した
 コンテキスト広告管理機能（初期開発版）を追加しました。
 
+記事のgenreと本文内容に基づき、広告をマッチング・表示・計測する仕組みです。
+
 詳しくは以下のリリースをご覧ください。
 
 - https://github.com/yoshid8s/ca-manager-extension/releases/tag/v0.4.6-1
