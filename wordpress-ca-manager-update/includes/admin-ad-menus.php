@@ -455,19 +455,13 @@ function handle_convert_application_to_context_ad() {
 
 
     $pricing_type = '';
-    if ( isset( $application['pricing_type'] ) ) {
-	    $pricing_type = (string) $application['pricing_type'];
-    } elseif ( isset( $application['price_type'] ) ) {
-	    $pricing_type = (string) $application['price_type'];
+    if ( isset( $application['bid_type'] ) ) {
+    	$pricing_type = (string) $application['bid_type'];
     }
 
     $unit_price = 0;
-    if ( isset( $application['unit_price'] ) ) {
-	    $unit_price = (float) $application['unit_price'];
-    } elseif ( isset( $application['desired_unit_price'] ) ) {
-	    $unit_price = (float) $application['desired_unit_price'];
-    } elseif ( isset( $application['price'] ) ) {
-	    $unit_price = (float) $application['price'];
+    if ( isset( $application['bid_price'] ) ) {
+	    $unit_price = (float) $application['bid_price'];
     }
 
     $context_ad = array(
@@ -479,6 +473,8 @@ function handle_convert_application_to_context_ad() {
 		'genre'                 => $context_genre,
         'enabled'               => 1,
 		'status'                => 'active',
+        'bid_type'              => $pricing_type,
+        'bid_price'             => $unit_price,
         'pricing_type'          => $pricing_type,
         'unit_price'            => $unit_price,
 		'start_date'            => isset( $application['start_date'] ) ? (string) $application['start_date'] : '',

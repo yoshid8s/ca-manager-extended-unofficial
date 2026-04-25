@@ -519,6 +519,8 @@ function cam_handle_save_context_ad() {
 		'status'             => isset( $_POST['cam_context_status'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_status'] ) ) : 'inactive',
 		'genre'              => isset( $_POST['cam_context_genre'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_genre'] ) ) : '',
 		'advertiser'         => isset( $_POST['cam_context_advertiser'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_advertiser'] ) ) : '',
+		'bid_type'           => isset( $_POST['cam_context_bid_type'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_bid_type'] ) ) : 'fixed',
+		'bid_price'          => isset( $_POST['cam_context_bid_price'] ) ? (float) $_POST['cam_context_bid_price'] : 0,
 
 		'start_date'         => isset( $_POST['cam_context_start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_start_date'] ) ) : '',
 		'end_date'           => isset( $_POST['cam_context_end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['cam_context_end_date'] ) ) : '',
@@ -536,6 +538,15 @@ function cam_handle_save_context_ad() {
 		'bottom_destination' => isset( $_POST['cam_context_bottom_destination'] ) ? esc_url_raw( wp_unslash( $_POST['cam_context_bottom_destination'] ) ) : '',
 	);
 
+	$allowed_bid_types = array( 'fixed', 'cpm', 'cpc' );
+
+	if ( ! in_array( $ad['bid_type'], $allowed_bid_types, true ) ) {
+		$ad['bid_type'] = 'fixed';
+	}
+
+	if ( $ad['bid_price'] < 0 ) {
+		$ad['bid_price'] = 0;
+	}
 	if ( '' === $ad['id'] ) {
 		$ad['id'] = 'cam-context-' . wp_generate_password( 8, false, false );
 	}
@@ -650,6 +661,9 @@ function cam_context_ads_settings_block() {
 		'genre'              => '',
 		'advertiser'         => '',
 
+		'bid_type'  => 'fixed',
+		'bid_price' => 0,
+
 		'start_date'         => '',
 		'end_date'           => '',
 
@@ -752,6 +766,30 @@ function cam_context_ads_settings_block() {
 						<p class="description">空欄なら終了日の制限なし</p>
 					</td>
 				</tr>
+				<tr>
+					<th scope="row"><label for="cam_context_ad_bid_type">単価種別</label></th>
+					<td>
+						<select name="cam_context_bid_type" id="cam_context_bid_type">
+							<option value="fixed" <?php \selected( $item['bid_type'], 'fixed' ); ?>>fixed</option>
+							<option value="cpc" <?php \selected( $item['bid_type'], 'cpc' ); ?>>CPC</option>
+							<option value="cpm" <?php \selected( $item['bid_type'], 'cpm' ); ?>>CPM</option>
+						</select>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="cam_context_ad_bid_price">希望単価</label></th>
+					<td>
+						<input
+							type="number"
+							name="cam_context_bid_price"
+							id="cam_context_ad_bid_price"
+							value="<?php echo esc_attr( $item['bid_price'] ); ?>"
+							min="0"
+							step="1"
+						/>
+					</td>
+					</tr>
 			</tbody>
 		</table>
 
@@ -2505,10 +2543,11 @@ function handle_ad_application_ready() {
 
 	global $wpdb;
 
-	$table = $wpdb->prefix . 'cam_ad_applications';
+	$applications_table = $wpdb->prefix . 'cam_ad_applications';
+	$items_table        = $wpdb->prefix . 'cam_ad_application_items';
 
 	$updated = $wpdb->update(
-		$table,
+		$applications_table,
 		array(
 			'status'     => 'ready',
 			'updated_at' => current_time( 'mysql' ),
@@ -2539,6 +2578,135 @@ function handle_ad_application_ready() {
 		exit;
 	}
 
+	$application = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT * FROM {$applications_table} WHERE id = %d LIMIT 1",
+			$application_id
+		),
+		ARRAY_A
+	);
+
+	if ( empty( $application ) ) {
+		$redirect_url = add_query_arg(
+			array(
+				'page'    => 'cam-ad-approved',
+				'message' => 'error_invalid_application',
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	$items = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT * FROM {$items_table} WHERE application_id = %d ORDER BY id ASC",
+			$application_id
+		),
+		ARRAY_A
+	);
+
+	$genre_map = array(
+		'fashion_suit'   => 'suit',
+		'fashion_casual' => 'casual',
+		'fashion_vintage'=> 'vintage',
+		'culture_book'   => 'book',
+		'culture_movie'  => 'movie',
+	);
+
+	$app_genre     = isset( $application['genre'] ) ? (string) $application['genre'] : '';
+	$context_genre = isset( $genre_map[ $app_genre ] ) ? $genre_map[ $app_genre ] : $app_genre;
+
+	if ( function_exists( '\Profile\Debug\debug' ) ) {
+		\Profile\Debug\debug(
+			'READY_SYNC_BEFORE_CONTEXT_AD application_id=' . $application_id . ' ' .
+			wp_json_encode(
+				array(
+					'id'         => isset( $application['id'] ) ? $application['id'] : '',
+					'advertiser' => isset( $application['advertiser_name_snapshot'] ) ? $application['advertiser_name_snapshot'] : '',
+					'bid_type'   => isset( $application['bid_type'] ) ? $application['bid_type'] : '',
+					'bid_price'  => isset( $application['bid_price'] ) ? $application['bid_price'] : '',
+					'genre'      => isset( $application['genre'] ) ? $application['genre'] : '',
+					'context_genre' => $context_genre,
+					'status'     => isset( $application['status'] ) ? $application['status'] : '',
+				),
+				JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+			)
+		);
+	}
+
+	$context_ad = array(
+		'id'                 => 'cam-context-app-' . $application_id,
+		'enabled'            => 1,
+		'status'             => 'active',
+		'genre'              => $context_genre,
+		'advertiser'         => isset( $application['advertiser_name_snapshot'] ) ? (string) $application['advertiser_name_snapshot'] : '',
+		'bid_type'           => isset( $application['bid_type'] ) ? (string) $application['bid_type'] : 'fixed',
+		'bid_price'          => isset( $application['bid_price'] ) ? (float) $application['bid_price'] : 0,
+		'start_date'         => isset( $application['start_date'] ) ? (string) $application['start_date'] : '',
+		'end_date'           => isset( $application['end_date'] ) ? (string) $application['end_date'] : '',
+
+		'top_headline'       => '',
+		'top_image'          => '',
+		'top_destination'    => '',
+
+		'middle_headline'    => '',
+		'middle_image'       => '',
+		'middle_destination' => '',
+
+		'bottom_headline'    => '',
+		'bottom_image'       => '',
+		'bottom_destination' => '',
+	);
+
+	if ( is_array( $items ) ) {
+		foreach ( $items as $item ) {
+			$position = isset( $item['slot_position'] ) ? (string) $item['slot_position'] : '';
+
+			if ( 'top' === $position ) {
+				$context_ad['top_headline']    = isset( $item['headline'] ) ? (string) $item['headline'] : '';
+				$context_ad['top_image']       = isset( $item['image_url'] ) ? (string) $item['image_url'] : '';
+				$context_ad['top_destination'] = isset( $item['landing_url'] ) ? (string) $item['landing_url'] : '';
+			}
+
+			if ( 'middle' === $position ) {
+				$context_ad['middle_headline']    = isset( $item['headline'] ) ? (string) $item['headline'] : '';
+				$context_ad['middle_image']       = isset( $item['image_url'] ) ? (string) $item['image_url'] : '';
+				$context_ad['middle_destination'] = isset( $item['landing_url'] ) ? (string) $item['landing_url'] : '';
+			}
+
+			if ( 'bottom' === $position ) {
+				$context_ad['bottom_headline']    = isset( $item['headline'] ) ? (string) $item['headline'] : '';
+				$context_ad['bottom_image']       = isset( $item['image_url'] ) ? (string) $item['image_url'] : '';
+				$context_ad['bottom_destination'] = isset( $item['landing_url'] ) ? (string) $item['landing_url'] : '';
+			}
+		}
+	}
+
+	$ads = get_option( 'cam_context_ads', array() );
+	if ( ! is_array( $ads ) ) {
+		$ads = array();
+	}
+
+	$synced  = false;
+	$sync_id = $context_ad['id'];
+
+	foreach ( $ads as $index => $existing_ad ) {
+		$existing_id = isset( $existing_ad['id'] ) ? (string) $existing_ad['id'] : '';
+
+		if ( $existing_id === $sync_id ) {
+			$ads[ $index ] = $context_ad;
+			$synced = true;
+			break;
+		}
+	}
+
+	if ( ! $synced ) {
+		$ads[] = $context_ad;
+	}
+
+	update_option( 'cam_context_ads', array_values( $ads ) );
+
 	$redirect_url = add_query_arg(
 		array(
 			'page'    => 'cam-ad-approved',
@@ -2546,6 +2714,7 @@ function handle_ad_application_ready() {
 		),
 		admin_url( 'admin.php' )
 	);
+
 	wp_safe_redirect( $redirect_url );
 	exit;
 }

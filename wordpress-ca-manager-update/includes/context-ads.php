@@ -61,15 +61,19 @@ function cam_get_context_ad_for_post( $post_id ) {
 			continue;
 		}
 
-		$score      = 0;
-		$advertiser = isset( $ad['advertiser'] ) ? strtolower( (string) $ad['advertiser'] ) : '';
+        $score      = 0;
+        $advertiser = isset( $ad['advertiser'] ) ? strtolower( (string) $ad['advertiser'] ) : '';
+        $bid_price  = isset( $ad['bid_price'] ) ? (float) $ad['bid_price'] : 0;
 
-		if ( '' !== $advertiser && '' !== $post_text && false !== strpos( $post_text, $advertiser ) ) {
-			$score += 100;
-		}
+        if ( '' !== $advertiser && '' !== $post_text && false !== strpos( $post_text, $advertiser ) ) {
+        	$score += 1000;
+        }
 
-		$ad['_match_score'] = $score;
-		$candidates[]       = $ad;
+        $score += $bid_price;
+
+        $ad['_match_score'] = $score;
+        $ad['_bid_price']   = $bid_price;
+        $candidates[]       = $ad;
 	}
 
 	if ( empty( $candidates ) ) {
@@ -98,6 +102,7 @@ function cam_get_context_ad_for_post( $post_id ) {
 				    		'advertiser' => isset( $ad['advertiser'] ) ? $ad['advertiser'] : '',
 				    		'genre'      => isset( $ad['genre'] ) ? $ad['genre'] : '',
 				    		'score'      => isset( $ad['_match_score'] ) ? $ad['_match_score'] : 0,
+                            'bid_price'  => isset( $ad['_bid_price'] ) ? $ad['_bid_price'] : 0,
 				    		'enabled'    => isset( $ad['enabled'] ) ? $ad['enabled'] : '',
 				    		'status'     => isset( $ad['status'] ) ? $ad['status'] : '',
 				    	);
