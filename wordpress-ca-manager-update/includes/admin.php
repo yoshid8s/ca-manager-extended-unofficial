@@ -901,6 +901,7 @@ function cam_context_ads_settings_block() {
 					<th>60秒</th>
 					<th>最終滞在</th>
 					<th>クリック</th>
+					<th>CTR</th>
 					<th>上クリック</th>
 					<th>中クリック</th>
 					<th>下クリック</th>
@@ -920,6 +921,14 @@ function cam_context_ads_settings_block() {
 					$stat = isset( $impression_stats[ $ad_id ] ) && is_array( $impression_stats[ $ad_id ] )
 						? $impression_stats[ $ad_id ]
 						: array();
+					
+					$impressions = isset( $stat['total'] ) ? (int) $stat['total'] : 0;
+					$clicks      = isset( $stat['click_total'] ) ? (int) $stat['click_total'] : 0;
+
+					$ctr = 0;
+					if ( $impressions > 0 ) {
+ 					   $ctr = ( $clicks / $impressions ) * 100;
+					}
 					?>
 					<tr>
 						<td><?php echo \esc_html( $ad_id ); ?></td>
@@ -938,6 +947,16 @@ function cam_context_ads_settings_block() {
 						<td><?php echo \esc_html( isset( $stat['time_60'] ) ? (string) $stat['time_60'] : '0' ); ?></td>
 						<td><?php echo \esc_html( isset( $stat['last_time_seen'] ) ? (string) $stat['last_time_seen'] : '' ); ?></td>
 						<td><?php echo \esc_html( isset( $stat['click_total'] ) ? (string) $stat['click_total'] : '0' ); ?></td>
+						<td>
+						<?php
+
+    						if ( $impressions > 0 ) {
+        						echo esc_html( number_format( ($clicks / $impressions) * 100, 2 ) ) . '%';
+    						} else {
+        					echo '-';
+    						}
+						?>
+						</td>	
 						<td><?php echo \esc_html( isset( $stat['click_top'] ) ? (string) $stat['click_top'] : '0' ); ?></td>
 						<td><?php echo \esc_html( isset( $stat['click_middle'] ) ? (string) $stat['click_middle'] : '0' ); ?></td>
 						<td><?php echo \esc_html( isset( $stat['click_bottom'] ) ? (string) $stat['click_bottom'] : '0' ); ?></td>

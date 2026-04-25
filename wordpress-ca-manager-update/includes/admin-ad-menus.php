@@ -295,6 +295,7 @@ function cam_ad_render_stats_page() {
 	echo '<th>60秒</th>';
 	echo '<th>最終滞在</th>';
 	echo '<th>クリック</th>';
+    echo '<th>CTR</th>';
 	echo '<th>上クリック</th>';
 	echo '<th>中クリック</th>';
 	echo '<th>下クリック</th>';
@@ -310,6 +311,14 @@ function cam_ad_render_stats_page() {
 foreach ( $ads as $ad ) {
 	$ad_id = isset( $ad['id'] ) ? (string) $ad['id'] : '';
 	$stat  = isset( $stats[ $ad_id ] ) && is_array( $stats[ $ad_id ] ) ? $stats[ $ad_id ] : array();
+
+    $impressions = isset( $stat['total'] ) ? (int) $stat['total'] : 0;
+    $clicks      = isset( $stat['click_total'] ) ? (int) $stat['click_total'] : 0;
+
+    $ctr = 0;
+    if ( $impressions > 0 ) {
+        $ctr = ( $clicks / $impressions ) * 100;
+    }
 
 	echo '<tr>';
 	echo '<td>' . esc_html( $ad_id ) . '</td>';
@@ -331,6 +340,7 @@ foreach ( $ads as $ad ) {
 	echo '<td>' . esc_html( isset( $stat['last_time_seen'] ) ? $stat['last_time_seen'] : '' ) . '</td>';
 
 	echo '<td>' . esc_html( isset( $stat['click_total'] ) ? (int) $stat['click_total'] : 0 ) . '</td>';
+    echo '<td>' . esc_html( number_format( $ctr, 2 ) ) . '%</td>';
 	echo '<td>' . esc_html( isset( $stat['click_top'] ) ? (int) $stat['click_top'] : 0 ) . '</td>';
 	echo '<td>' . esc_html( isset( $stat['click_middle'] ) ? (int) $stat['click_middle'] : 0 ) . '</td>';
 	echo '<td>' . esc_html( isset( $stat['click_bottom'] ) ? (int) $stat['click_bottom'] : 0 ) . '</td>';
