@@ -79,12 +79,10 @@ final class Uca {
 				. ' | //h4[@id and starts-with(@id, "op-body-")]'
 				. ' | //h5[@id and starts-with(@id, "op-body-")]'
 				. ' | //h6[@id and starts-with(@id, "op-body-")]'
-				. ' | //ul[@id and starts-with(@id, "op-body-")]'
-				. ' | //ol[@id and starts-with(@id, "op-body-")]'
 				. ' | //blockquote[@id and starts-with(@id, "op-body-")]'
 				. ' | //figcaption[@id and starts-with(@id, "op-body-")]'
-				. ' | //span[@id and starts-with(@id, "op-body-")]'
 				. ' | //pre[@id and starts-with(@id, "op-body-")]'
+				. ' | //a[@id and starts-with(@id, "op-body-") and contains(concat(" ", normalize-space(@class), " "), " wp-block-latest-posts__post-title ")]'
 			);
 
 			if ( $nodes ) {
@@ -101,8 +99,19 @@ final class Uca {
 						continue;
 					}
 
-					$paragraph_html = html_entity_decode( $paragraph_html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+					$paragraph_html = html_entity_decode(
+						$paragraph_html,
+						ENT_QUOTES | ENT_HTML5,
+						'UTF-8'
+					);
 
+					debug(
+						'UCA_TARGET index=' . count( $text_targets ) .
+						', selector=#' . $id .
+						', tag=' . strtolower( $node->tagName ) .
+						', class=' . $node->getAttribute( 'class' ) .
+						', content_head=' . mb_substr( $paragraph_html, 0, 200 )
+					);
 					$text_targets[] = array(
 						'type'        => 'TextTargetIntegrity',
 						'content'     => $paragraph_html,

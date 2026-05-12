@@ -1463,7 +1463,19 @@ function profile_paragraph_id_from_text( string $text ): string {
  * @return array
  */
 function profile_target_tag_names(): array {
-	return array( 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote', 'figcaption', 'pre' );
+	return array(
+		'p',
+		'h1',
+		'h2',
+		'h3',
+		'h4',
+		'h5',
+		'h6',
+		'blockquote',
+		'pre',
+		'a',
+		'div',
+	);
 }
 
 /**
@@ -1472,18 +1484,21 @@ function profile_target_tag_names(): array {
  * @return string
  */
 function profile_target_xpath(): string {
-	return '//p'
-		. ' | //h1'
-		. ' | //h2'
-		. ' | //h3'
-		. ' | //h4'
-		. ' | //h5'
-		. ' | //h6'
-		. ' | //ul'
-		. ' | //ol'
-		. ' | //blockquote'
-		. ' | //figcaption'
-		. ' | //pre';
+	return implode(
+		' | ',
+		array(
+			'//p',
+			'//h1',
+			'//h2',
+			'//h3',
+			'//h4',
+			'//h5',
+			'//h6',
+			'//blockquote',
+			'//pre',
+			'//a[contains(concat(" ", normalize-space(@class), " "), " wp-block-latest-posts__post-title ")]',
+		)
+	);
 }
 
 /**
@@ -1514,6 +1529,34 @@ function profile_should_skip_text_target_node( \DOMElement $el ): bool {
 	$text = profile_normalize_paragraph_text( $el->textContent );
 	return '' === $text;
 }
+
+/**
+ * 古いID を削除
+ *
+ */
+function profile_remove_stale_op_body_ids( \DOMXPath $xpath ): void {
+	$nodes = $xpath->query( '//*[@id and starts-with(@id, "op-body-")]' );
+
+	if ( ! $nodes ) {
+		return;
+	}
+
+	foreach ( $nodes as $node ) {
+		if ( ! $node instanceof \DOMElement ) {
+			continue;
+		}
+
+		$tag = strtolower( $node->tagName );
+
+		if ( in_array( $tag, array( 'ul', 'ol', 'li', 'div', 'figure' ), true ) ) {
+			$class = ' ' . $node->getAttribute( 'class' ) . ' ';
+
+			debug( 'profile_remove_stale_op_body_ids removed stale id=' . $node->getAttribute( 'id' ) . ' from tag=' . $tag );
+			$node->removeAttribute( 'id' );
+		}
+	}
+}
+
 
 /**
  * 対象タグへ ID を付与
@@ -1550,6 +1593,9 @@ function add_ids_to_paragraphs_for_ca( string $html ): string {
 	}
 
 	$xpath = new \DOMXPath( $doc );
+
+	profile_remove_stale_op_body_ids( $xpath );
+
 	$nodes = $xpath->query( profile_target_xpath() );
 
 	if ( ! $nodes ) {
@@ -1579,8 +1625,48 @@ function add_ids_to_paragraphs_for_ca( string $html ): string {
 			$node->removeAttribute( 'id' );
 		}
 
-		$text    = profile_normalize_paragraph_text( $node->textContent );
-		$base_id = profile_paragraph_id_from_text( $text );
+		$tag_name = strtolower( $node->tagName );
+		$class    = ' ' . $node->getAttribute( 'class' ) . ' ';
+
+		if (
+			'a' === $tag_name &&
+			false !== strpos( $class, ' wp-block-latest-posts__post-title ' ) &&
+			$node->hasAttribute( 'href' )
+		) {
+			$href    = (string) $node->getAttribute( 'href' );
+			$base_id = 'op-body-latest-title-' . substr( sha1( $href ), 0, 12 );
+
+		} elseif (
+			'div' === $tag_name &&
+			false !== strpos( $class, ' wp-block-latest-posts__post-excerpt ' )
+		) {
+			$href = '';
+
+			$prev = $node->previousSibling;
+			while ( $prev ) {
+				if (
+					$prev instanceof \DOMElement &&
+					'a' === strtolower( $prev->tagName ) &&
+					$prev->hasAttribute( 'href' )
+				) {
+					$href = (string) $prev->getAttribute( 'href' );
+					break;
+				}
+					$prev = $prev->previousSibling;
+			}
+
+			if ( '' !== $href ) {
+				$base_id = 'op-body-latest-excerpt-' . substr( sha1( $href ), 0, 12 );
+			} else {
+				$text    = profile_normalize_paragraph_text( $node->textContent );
+				$base_id = profile_paragraph_id_from_text( $text );
+			}
+
+		} else {
+			$text    = profile_normalize_paragraph_text( $node->textContent );
+			$base_id = profile_paragraph_id_from_text( $text );
+		}
+
 		$final_id = $base_id;
 
 		if ( ! isset( $seen_ids[ $base_id ] ) ) {
@@ -1710,7 +1796,7 @@ function extract_image_html_by_url( string $html, string $image_url ): string {
  * @return string
  */
 function add_ids_to_embedded_images_for_ca( string $html, array $embedded_items ): string {
-	if ( '' === trim( $html ) || empty( $embedded_items ) ) {
+	if ( '' === trim( $html ) ) {
 		return $html;
 	}
 
@@ -1736,36 +1822,67 @@ function add_ids_to_embedded_images_for_ca( string $html, array $embedded_items 
 		return $html;
 	}
 
-	foreach ( $embedded_items as $item ) {
-		$kind      = isset( $item['kind'] ) ? (string) $item['kind'] : 'article';
-		$image_url = isset( $item['image_url'] ) ? (string) $item['image_url'] : '';
 
-		if ( 'image' !== $kind || '' === $image_url ) {
-			continue;
+	if ( ! empty( $embedded_items ) ) {
+		foreach ( $embedded_items as $item ) {
+			$kind      = isset( $item['kind'] ) ? (string) $item['kind'] : 'article';
+			$image_url = isset( $item['image_url'] ) ? (string) $item['image_url'] : '';
+
+			if ( 'image' !== $kind || '' === $image_url ) {
+				continue;
+			}
+
+			$target_basename = \wp_basename( \wp_parse_url( $image_url, PHP_URL_PATH ) ?: '' );
+			$target_id       = 'op-image-' . substr( sha1( $image_url ), 0, 8 );
+
+			foreach ( $imgs as $img ) {
+				if ( ! $img instanceof \DOMElement ) {
+					continue;
+				}
+
+				$src = (string) $img->getAttribute( 'src' );
+				if ( '' === $src ) {
+					continue;
+				}
+
+				$src_basename = \wp_basename( \wp_parse_url( $src, PHP_URL_PATH ) ?: '' );
+
+				if ( $src === $image_url || $src_basename === $target_basename ) {
+					$img->setAttribute( 'id', $target_id );
+
+					debug( 'add_ids_to_embedded_images_for_ca assigned id=' . $target_id . ' for image_url=' . $image_url );
+
+					break;
+				}
+			}
 		}
+	}
 
-		$target_basename = \wp_basename( \wp_parse_url( $image_url, PHP_URL_PATH ) ?: '' );
-		$target_id       = 'op-image-' . substr( sha1( $image_url ), 0, 8 );
+	// Latest Posts ブロック内の画像にも ID を付与する
+	$latest_post_imgs = $xpath->query(
+		'//img[@src and ancestor::*[contains(concat(" ", normalize-space(@class), " "), " wp-block-latest-posts ")]]'
+	);
 
-		foreach ( $imgs as $img ) {
+	if ( $latest_post_imgs ) {
+		foreach ( $latest_post_imgs as $img ) {
 			if ( ! $img instanceof \DOMElement ) {
 				continue;
 			}
 
+			if ( $img->hasAttribute( 'id' ) ) {
+				continue;
+			}
+
 			$src = (string) $img->getAttribute( 'src' );
+
 			if ( '' === $src ) {
 				continue;
 			}
 
-			$src_basename = \wp_basename( \wp_parse_url( $src, PHP_URL_PATH ) ?: '' );
+			$img_id = 'op-image-' . substr( sha1( $src ), 0, 8 );
+			$img->setAttribute( 'id', $img_id );
 
-			if ( $src === $image_url || $src_basename === $target_basename ) {
-				$img->setAttribute( 'id', $target_id );
-
-				debug( 'add_ids_to_embedded_images_for_ca assigned id=' . $target_id . ' for image_url=' . $image_url );
-
-				break;
-			}
+			debug( 'add_ids_to_embedded_images_for_ca assigned latest-posts image id=' . $img_id . ' for src=' . $src );
 		}
 	}
 
@@ -1782,7 +1899,7 @@ function add_ids_to_embedded_images_for_ca( string $html, array $embedded_items 
  * @return string
  */
 function inject_text_target_ids_into_front_html( string $content ): string {
-	if ( ! \is_singular( array( 'post', 'page' ) ) ) {
+	if ( ! \is_singular( array( 'post', 'page' ) ) && ! \is_front_page() && ! \is_home() ) {
 		return $content;
 	}
 
@@ -1802,18 +1919,28 @@ function inject_text_target_ids_into_front_html( string $content ): string {
  * @return string
  */
 function inject_embedded_image_ids_into_front_html( string $content ): string {
-	if ( ! \is_singular( array( 'post', 'page' ) ) ) {
+	if ( ! \is_singular( array( 'post', 'page' ) ) && ! \is_front_page() && ! \is_home() ) {
+		return $content;
+	}
+
+	if ( '' === trim( $content ) ) {
 		return $content;
 	}
 
 	$post_id = \get_the_ID();
+
+	if ( ! $post_id && ( \is_front_page() || \is_home() ) ) {
+		$post_id = (int) \get_option( 'page_on_front' );
+	}
+
 	if ( ! $post_id ) {
 		return $content;
 	}
 
 	$embedded_items = \get_post_meta( $post_id, '_cam_embedded_items', true );
-	if ( ! \is_array( $embedded_items ) || empty( $embedded_items ) ) {
-		return $content;
+
+	if ( ! \is_array( $embedded_items ) ) {
+		$embedded_items = array();
 	}
 
 	return add_ids_to_embedded_images_for_ca( $content, $embedded_items );
@@ -2243,10 +2370,13 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 		debug( 'create_uca_list after add_ids_to_paragraphs_for_ca, page=' . $page );
 
 		$embedded_items_for_ids = \get_post_meta( $post->ID, '_cam_embedded_items', true );
-		if ( \is_array( $embedded_items_for_ids ) && ! empty( $embedded_items_for_ids ) ) {
-			$content = add_ids_to_embedded_images_for_ca( $content, $embedded_items_for_ids );
-			debug( 'create_uca_list after add_ids_to_embedded_images_for_ca, page=' . $page );
+
+		if ( ! \is_array( $embedded_items_for_ids ) ) {
+			$embedded_items_for_ids = array();
 		}
+
+		$content = add_ids_to_embedded_images_for_ca( $content, $embedded_items_for_ids );
+		debug( 'create_uca_list after add_ids_to_embedded_images_for_ca, page=' . $page );
 
 		$title_text = $post->post_title;
 		$title_id   = profile_paragraph_id_from_text( $title_text );
