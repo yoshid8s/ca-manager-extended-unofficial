@@ -949,6 +949,43 @@ function init() {
 }
 
 /**
+ * Colibri / Swiper duplicate slide support.
+ *
+ * Swiper creates duplicated slide DOMs after page load.
+ * If duplicated slides keep id="op-body-*", CA verification becomes unstable.
+ */
+function cam_colibri_remove_duplicate_swiper_op_body_ids_script(): void {
+	if ( ! \is_singular( array( 'post', 'page' ) ) && ! \is_front_page() && ! \is_home() ) {
+		return;
+	}
+	?>
+	<script>
+	(function () {
+		function removeDuplicateSwiperOpBodyIds() {
+			document
+				.querySelectorAll('.swiper-slide-duplicate [id^="op-body-"]')
+				.forEach(function (el) {
+					el.removeAttribute('id');
+				});
+		}
+
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', removeDuplicateSwiperOpBodyIds);
+		} else {
+			removeDuplicateSwiperOpBodyIds();
+		}
+
+		window.addEventListener('load', removeDuplicateSwiperOpBodyIds);
+
+		setTimeout(removeDuplicateSwiperOpBodyIds, 500);
+		setTimeout(removeDuplicateSwiperOpBodyIds, 1500);
+	})();
+	</script>
+	<?php
+}
+add_action( 'wp_footer', __NAMESPACE__ . '\\cam_colibri_remove_duplicate_swiper_op_body_ids_script', 99 );
+
+/**
  * 公開済み記事を更新したときの再発行
  *
  * @param int      $post_id Post ID
@@ -1997,7 +2034,49 @@ function inject_text_target_ids_into_front_html( string $content ): string {
 
 	debug( 'inject_text_target_ids_into_front_html called' );
 
-	return add_ids_to_paragraphs_for_ca( $content );
+	$content = add_ids_to_paragraphs_for_ca( $content );
+
+	// Remove duplicated op-body IDs from Swiper duplicate slides.
+	$content = remove_swiper_duplicate_op_body_ids( $content );
+
+	return $content;
+}
+
+/**
+ * Remove op-body-* ids from swiper duplicate slides.
+ *
+ * Colibri / Swiper duplicates slides and duplicated IDs
+ * break CA verification.
+ *
+ * @param string $html HTML content.
+ * @return string
+ */
+function remove_swiper_duplicate_op_body_ids( string $html ): string {
+
+	if ( false === strpos( $html, 'swiper-slide-duplicate' ) ) {
+		return $html;
+	}
+
+	$pattern = '/(<[^>]*class="[^"]*swiper-slide-duplicate[^"]*"[^>]*>.*?)(id="op-body-[^"]+")/is';
+
+	$html = preg_replace_callback(
+		$pattern,
+		function ( $matches ) {
+
+			debug(
+				'remove_swiper_duplicate_op_body_ids removed ' . $matches[2]
+			);
+
+			return str_replace(
+				$matches[2],
+				'',
+				$matches[0]
+			);
+		},
+		$html
+	);
+
+	return is_string( $html ) ? $html : '';
 }
 
 /**
