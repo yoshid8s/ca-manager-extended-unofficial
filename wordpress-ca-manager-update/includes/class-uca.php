@@ -178,10 +178,25 @@ final class Uca {
 		'target'            => array_merge(
 			$text_targets,
 			array_map(
-				fn( $integrity ) => array(
-					'type'      => 'ExternalResourceTargetIntegrity',
-					'integrity' => $integrity,
-				),
+				static function ( $resource ) {
+					if ( is_array( $resource ) ) {
+						$target = array(
+							'type'      => 'ExternalResourceTargetIntegrity',
+							'integrity' => (string) ( $resource['integrity'] ?? '' ),
+						);
+
+						if ( ! empty( $resource['cssSelector'] ) ) {
+							$target['cssSelector'] = (string) $resource['cssSelector'];
+						}
+
+						return $target;
+					}
+
+					return array(
+						'type'      => 'ExternalResourceTargetIntegrity',
+						'integrity' => (string) $resource,
+					);
+				},
 				$this->external_resources,
 			)
 		),

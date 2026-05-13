@@ -1882,6 +1882,11 @@ function add_ids_to_embedded_images_for_ca( string $html, array $embedded_items 
 			$img_id = 'op-image-' . substr( sha1( $src ), 0, 8 );
 			$img->setAttribute( 'id', $img_id );
 
+			$integrity = find_attachment_integrity_by_image_url( $src );
+			if ( is_string( $integrity ) && '' !== $integrity ) {
+				$img->setAttribute( 'integrity', $integrity );
+			}
+
 			debug( 'add_ids_to_embedded_images_for_ca assigned latest-posts image id=' . $img_id . ' for src=' . $src );
 		}
 	}
@@ -1890,6 +1895,89 @@ function add_ids_to_embedded_images_for_ca( string $html, array $embedded_items 
 	libxml_clear_errors();
 
 	return is_string( $result ) ? $result : $html;
+}
+
+/**
+ * 投稿抜粋の画像もCA発行対象にする
+ *
+ * @param string $content the_content 後のHTML
+ * @return string
+ */
+function latest_posts_image_external_resources_from_html( string $html ): array {
+	if ( '' === trim( $html ) ) {
+		return array();
+	}
+
+	libxml_use_internal_errors( true );
+
+	$doc = new \DOMDocument();
+	$loaded = $doc->loadHTML(
+		'<?xml encoding="utf-8" ?>' . $html,
+		LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+	);
+
+	if ( ! $loaded ) {
+		libxml_clear_errors();
+		debug( 'latest_posts_image_external_resources_from_html: DOM loadHTML failed' );
+		return array();
+	}
+
+	$xpath = new \DOMXPath( $doc );
+
+	$imgs = $xpath->query(
+		'//img[@id and starts-with(@id, "op-image-") and @src and ancestor::*[contains(concat(" ", normalize-space(@class), " "), " wp-block-latest-posts ")]]'
+	);
+
+	if ( ! $imgs ) {
+		libxml_clear_errors();
+		return array();
+	}
+
+	$resources = array();
+
+	foreach ( $imgs as $img ) {
+		if ( ! $img instanceof \DOMElement ) {
+			continue;
+		}
+
+		$id  = (string) $img->getAttribute( 'id' );
+		$src = (string) $img->getAttribute( 'src' );
+
+		if ( '' === $id || '' === $src ) {
+			continue;
+		}
+
+		$integrity = '';
+
+		if ( $img->hasAttribute( 'integrity' ) ) {
+			$integrity = trim( preg_replace( '/\s+/', ' ', (string) $img->getAttribute( 'integrity' ) ) );
+		}
+
+		if ( '' === $integrity ) {
+			$integrity = find_attachment_integrity_by_image_url( $src );
+		}
+
+		if ( '' === $integrity || null === $integrity ) {
+			debug( 'latest_posts_image_external_resources skipped: integrity not found for src=' . $src );
+			continue;
+		}
+
+		$resources[] = array(
+			'cssSelector' => '#' . $id,
+			'integrity'   => trim( preg_replace( '/\s+/', ' ', $integrity ) ),
+		);
+
+		debug(
+			'latest_posts_image_external_resources added selector=#' .
+			$id .
+			', src=' . $src .
+			', integrity=' . $integrity
+		);
+	}
+
+	libxml_clear_errors();
+
+	return $resources;
 }
 
 /**
@@ -2504,6 +2592,20 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 			', raw_count=' . count( $raw_external_resources ) .
 			', normalized_count=' . count( $external_resources )
 		);	
+
+		$latest_posts_image_resources = latest_posts_image_external_resources_from_html( $main_html );
+
+		if ( ! empty( $latest_posts_image_resources ) ) {
+			$external_resources = array_merge(
+				$external_resources,
+				$latest_posts_image_resources
+			);
+
+			debug(
+				'LATEST_POSTS_IMAGE_EXTERNAL_RESOURCES count=' .
+				count( $latest_posts_image_resources )
+			);
+		}
 
 		debug(
 			'MAIN_HTML_HEAD=' .
