@@ -2,7 +2,7 @@
 🇺🇸 For English readers:
 [Jump to English version](#english)
 
-本プラグインは、Content Attestation（CA）発行・検証対応プラグインです。
+本プラグインは、WordPress向けのContent Attestation（CA）発行・検証対応プラグインです。
 
 本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったもので、<br>
 記事CAと広告配信を連動させたコンテキスト広告モデルの実装しています。<br>
@@ -255,7 +255,7 @@ MIT License
 # English Version
 
 # ca-manager-extension
-This plugin is a Content Attestation (CA) issuance and verification plugin.
+This plugin is a WordPress plugin that supports Content Attestation (CA) issuance and verification.
 
 This implementation is an independent extension based on the official CA Manager (v0.4.3), and implements a contextual advertising model that links article CAs and ad delivery.
 
