@@ -1,4 +1,7 @@
 # ca-manager-extension
+🇺🇸 For English readers:
+[Jump to English version](#english)
+
 本プラグインは、Content Attestation（CA）発行・検証対応プラグインです。
 
 本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったもので、<br>
@@ -245,6 +248,259 @@ Yoshifumi Takeuchi
 ## License: 
 
 MIT License
+
+<a id="english"></a>
+
+# English Version
+
+# ca-manager-extension
+This plugin is a Content Attestation (CA) issuance and verification plugin.
+
+This implementation is an independent extension based on the official CA Manager (v0.4.3), and implements a contextual advertising model that links article CAs and ad delivery.
+
+<br>
+While ad CAs are originally intended to be signed by advertisers,
+<br>
+This implementation adopts a configuration where the media issues the ad CA to demonstrate a linked model between ad delivery and article CAs.
+
+<br>
+This is an example of a model that assumes practical operation based on a trust relationship between advertisers and media.
+
+<br>
+This is a provisional design that considers the burden of OP/CA implementation on the advertiser side, and<br>
+It is assumed that once OP becomes widespread, it will be linked to CA issuance by the advertiser themselves.
+
+## Compatibility
+
+This plugin is implemented assuming a traditional (classic) theme.
+
+Tested and confirmed to work:
+- Chic
+- Twenty Eleven
+
+Not supported/Not tested (as of v0.4.4-1):
+- Drag-and-drop type dedicated builders (e.g., Colibri, etc.)
+
+These builder environments may not function correctly due to differences in DOM structure, and further support is needed.
+
+# CA Manager Extension
+
+This is an extended implementation based on CA Manager (v0.4.3), designed for practical use on WordPress.
+
+The latest version (v0.4.6-6) can be downloaded from [Releases](https://github.com/yoshid8s/ca-manager-extension/releases).
+
+## CA Manager Extension Application Scope Extended Version: CA Metadata-Linked Ad Management (Prototype)
+
+v0.4.6-1 adds a contextual ad management function (initial development version) that utilizes Content Attestation (CA) metadata.
+
+This mechanism matches, displays, and measures ads based on the article's genre and content. ## Contextual Ad Mechanism
+
+This plugin automatically displays contextually relevant ads based on article content and ad application data.
+
+### Overall Flow
+
+---
+```mermaid
+flowchart TD
+A [Ad Application<br> Advertiser / Genre / Bid Price]
+B [Application Data Storage]
+C [Contextual Ad Generation<br> (CA Issued)]
+D [Article Display]
+E [Content Analysis<br> Genre / Body Text]
+F [Ad Matching<br> + Scoring]
+G [Optimal Ad Display]
+
+A --> B --> C --> D --> E --> F --> G
+```
+
+---
+
+### Ad Selection Logic
+
+Contextual ads are selected based on the following conditions:
+
+- The article's `genre` matches the ad's `genre`.
+- Within the ad's publication period.
+- The ad is active.
+- Score is added if the advertiser's name is included in the article text.
+- (Future) Prioritization based on bid price (bid_price)
+
+---
+
+### Features
+
+- Ad application data is directly reflected in the delivery logic.
+- Ad management is completed within the CMS.
+- Ensures semantic consistency between content and ads.
+- Supports future auction-type advertising.
+
+---
+
+### Implementation Example
+
+Fashion blog "JiJi Style"
+https://style.yh-inc.jp/ <br>
+(Contextual ads and article CA are actually working in conjunction.)
+
+- Ads from suit brands are displayed on pages about suits.
+- Ads from casual wear brands are displayed on pages about casual wear.
+→ Only ads of the same genre as the article's genre are displayed.
+→ If a specific brand name is included in the article, that brand will be displayed preferentially.
+
+---
+
+### Future Expansions
+
+- Bid-based ad ranking
+- Auction selection for multiple ads
+- CTR/impression-based optimization
+
+For details, please see the following release:
+
+- https://github.com/yoshid8s/ca-manager-extension/releases/tag/v0.4.6-1
+
+## Main Features
+- CA management per post
+- Ad CA (Online Ad)
+- Embedded content CA
+- Bulk article CA issuance function
+- CA issuance for multiple articles
+- Contextual ad management function
+- Example UI image (see diagram below)
+
+## Management Screen (Settings/Bulk Issuance)
+
+This is the management screen for CA settings and bulk issuance of article CAs.
+
+<img width="536" height="542" alt="image" src="https://github.com/user-attachments/assets/eb99ffdf-da5d-4062-b24b-3422214bd418" />
+
+## Example Editing Screen (Individual CA Management)
+This screen allows you to issue CAs individually on the editing page. You can issue not only article CAs, but also ad CAs, quoted text CAs from third parties, and quoted image CAs.
+
+<img width="1458" height="417" alt="image" src="https://github.com/user-attachments/assets/aa652fb6-77c4-4924-93ba-b69fdb4183b1" />
+
+## Positioning
+This implementation is a reference implementation to enable the implementation of the premise of "issuing CAs on an individual selector basis" in the OP within a CMS environment.
+
+## Target Users
+
+- WordPress site administrators
+- Developers who want to prove the authenticity and source of their content
+- Engineers interested in Content Attestation (CA) and OP (Open Source)
+
+## Table of Contents
+
+- [Main Features]
+- [Update History]
+- [Image Integrity Processing]
+- [Installation Instructions]
+- [How to Use]
+
+## CA Manager Extension (v0.4.3-2)
+
+Bug fixes. Please refer to the update history.
+
+
+## Latest update (v0.4.4-1)
+
+- Added bulk CA issuance function for articles
+- Improved stability of CA issuance for multiple articles
+
+---
+
+## Main Features
+
+- CA issuance for article body (TextTargetIntegrity)
+- CA issuance for embedded images (ExternalResourceTargetIntegrity)
+- CA issuance for advertising content
+- CA management from WordPress editing screen
+- Automatic embedding of CAS (application/cas+json)
+- Bulk CA issuance function for articles
+- CA issuance for multiple articles
+
+---
+
+## Update History
+
+### v0.4.4-1 (2026-04)
+
+- Added bulk CA issuance function for articles
+- Improved stability of CA issuance for multiple articles
+
+### v0.4.3-2 (2026-04)
+
+#### Bug fixes
+
+**1. **Fixed ExternalResourceTargetIntegrity for srcset images**
+- Fixed an issue where multiple hashes from `srcset` were being split.
+- Changed the `integrity` attribute of each image to be treated as a single value.
+
+**2. Issue where images were not included in article CA**
+- Fixed a bug where `external_resources` was not being passed to the main article CA.
+- Improved so that image integrity information is included in the article CA when there is no embedded image CA.
+
+**3. Corrected consistency between CAs**
+- Unified the following processes:
+- Article CA
+- Embedded image CA
+- Advertisement CA
+- Resolved inconsistencies that caused validation errors.
+
+---
+
+## About Image Integrity Processing
+
+In this plugin, even if the `integrity` attribute of the `<img>` tag contains multiple hash values ​​(e.g., srcset),
+they are not split and are treated as a single integrity value.
+
+
+- Integrity value is used as a single string.
+- Do not split into individual hashes.
+- Target:
+- Article CA
+- Embedded Image CA
+- Ad CA
+
+This ensures the stability of validation.
+
+--
+## Installation Method
+
+### Method 1 (For Developers)
+
+```bash
+git clone https://github.com/yoshid8s/ca-manager-extension.git
+Place it in `wp-content/plugins/` in WordPress and activate it from the admin screen.
+``
+
+### Method 2 (Manual)
+
+Download the repository
+ZIP the folder
+Upload from the WordPress admin screen
+
+### How to Use
+
+- Open the post editing screen.
+- Select the target content in CA Manager.
+- Save and CAS will be automatically generated.
+
+### Notes
+
+Images containing srcset must match the actual browser DOM.
+Changing the HTML structure will cause validation errors.
+
+### Author
+
+Yoshifumi Takeuchi
+
+## License:
+
+MIT License
+
+## Notice
+
+This project is based on the official CA Manager developed by the Originator Profile (OP) project, with additional modifications and extensions.
 
 ## Notice
 
