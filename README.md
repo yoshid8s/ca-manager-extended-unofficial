@@ -286,31 +286,29 @@ These builder environments may not function correctly due to differences in DOM 
 # CA Manager Extension
 
 This is an extended implementation based on CA Manager (v0.4.3), designed for practical use on WordPress.
-
 The latest version (v0.4.6-6) can be downloaded from [Releases](https://github.com/yoshid8s/ca-manager-extension/releases).
 
 ## CA Manager Extension Application Scope Extended Version: CA Metadata-Linked Ad Management (Prototype)
 
 v0.4.6-1 adds a contextual ad management function (initial development version) that utilizes Content Attestation (CA) metadata.
-
 This mechanism matches, displays, and measures ads based on the article's genre and content. ## Contextual Ad Mechanism
-
 This plugin automatically displays contextually relevant ads based on article content and ad application data.
 
 ### Overall Flow
 
 ---
+
 ```mermaid
 flowchart TD
-A [Ad Application<br> Advertiser / Genre / Bid Price]
-B [Application Data Storage]
-C [Contextual Ad Generation<br> (CA Issued)]
-D [Article Display]
-E [Content Analysis<br> Genre / Body Text]
-F [Ad Matching<br> + Scoring]
-G [Optimal Ad Display]
+    A["Ad Application<br/>Advertiser / Genre / Bid Price"]
+    B["Application Data Storage"]
+    C["Contextual Ad Generation<br/>(CA Issued)"]
+    D["Article Display"]
+    E["Content Analysis<br/>Genre / Body Text"]
+    F["Ad Matching<br/>+ Scoring"]
+    G["Optimal Ad Display"]
 
-A --> B --> C --> D --> E --> F --> G
+    A --> B --> C --> D --> E --> F --> G
 ```
 
 ---
@@ -471,7 +469,7 @@ This ensures the stability of validation.
 ```bash
 git clone https://github.com/yoshid8s/ca-manager-extension.git
 Place it in `wp-content/plugins/` in WordPress and activate it from the admin screen.
-``
+```
 
 ### Method 2 (Manual)
 
