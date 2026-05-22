@@ -130,18 +130,22 @@ function register_settings() {
 	\register_setting( 'ca-manager', 'profile_ca_server_hostname', array( 'default' => PROFILE_DEFAULT_CA_SERVER_HOSTNAME ) );
 	\register_setting( 'ca-manager', 'profile_ca_issuer_id' );
 	\register_setting( 'ca-manager', 'profile_ca_server_admin_secret' );
+/*
 	\register_setting( 'ca-manager', 'profile_ca_target_type', array( 'default' => PROFILE_DEFAULT_CA_TARGET_TYPE ) );
 	\register_setting( 'ca-manager', 'profile_ca_target_css_selector', array( 'default' => PROFILE_DEFAULT_CA_TARGET_CSS_SELECTOR ) );
 	\register_setting( 'ca-manager', 'profile_ca_target_html', array( 'default' => PROFILE_DEFAULT_CA_TARGET_HTML ) );
+*/
 	\register_setting( 'ca-manager', 'profile_ca_embedded_or_external', array( 'default' => 'embedded' ) );
 	\register_setting( 'ca-manager', 'profile_ca_log_option', array( 'default' => '0' ) );
 	\add_settings_section( 'profile_settings', '設定', '\Profile\Admin\profile_settings_section', 'ca-manager' );
 	\add_settings_field( 'profile_ca_issuer_id', 'CA issuer\'s Originator Profile ID', '\Profile\Admin\profile_ca_issuer_id_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_server_hostname', 'CAサーバーホスト名', '\Profile\Admin\profile_ca_server_hostname_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_server_admin_secret', '認証情報', '\Profile\Admin\profile_ca_server_admin_secret_field', 'ca-manager', 'profile_settings' );
-	\add_settings_field( 'profile_ca_target_type', '検証対象の種別', '\Profile\Admin\profile_ca_target_type_field', 'ca-manager', 'profile_settings' );
+/*	
+	\add_settings_field( 'profile_ca_target_type', '検証対象の種別', '\Profile\Admin\profile_ca_target_type_field', 'ca-manager', 'profile_settings' );	
 	\add_settings_field( 'profile_ca_target_css_selector', '検証対象要素CSSセレクター', '\Profile\Admin\profile_ca_target_css_selector_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_target_html', '検証対象要素の存在するHTML', '\Profile\Admin\profile_ca_target_html_field', 'ca-manager', 'profile_settings' );
+*/
 	\add_settings_field( 'profile_ca_embedded_or_external', 'CA Presentation Type', '\Profile\Admin\profile_ca_embedded_or_external_field', 'ca-manager', 'profile_settings' );
 	\add_settings_field( 'profile_ca_log_option', 'ログの出力設定', '\Profile\Admin\profile_ca_log_option_field', 'ca-manager', 'profile_settings' );
 }
@@ -266,6 +270,13 @@ function settings_page() {
 			<?php \wp_nonce_field( 'cam_bulk_issue_article_ca_action', 'cam_bulk_issue_article_ca_nonce' ); ?>
 			<input type="hidden" name="action" value="cam_bulk_issue_article_ca">
 
+			<p>
+				<label>
+					<input type="checkbox" name="cam_force_reissue_article_ca" value="1">
+					発行済みの記事CAも再発行する
+				</label>
+			</p>
+
 			<table class="form-table" role="presentation">
 				<tbody>
 					<tr>
@@ -310,7 +321,54 @@ function settings_page() {
 /** 設定セクション */
 function profile_settings_section() {
 	?>
-		<p>これらの設定が完了しないと Content Attestation (CA) の発行機能は正しく動作しません。正しく設定が反映されると、それ以降に更新した投稿と新規投稿は自動的にCAサーバーに送信されます。</p>
+		<p>
+			本プラグインは、Content Attestation (CA) の発行をサポートするアプリケーションで、以下の機能を提供します。
+		</p>
+
+		<details style="margin: 12px 0 24px;">
+			<summary style="
+				cursor: pointer;
+				font-weight: 600;
+				background-color: #fff;
+				padding: 8px 12px;
+				border: 1px solid #ccd0d4;
+				border-radius: 4px;
+			">
+				アプリの説明
+			</summary>
+
+			<div style="margin-top: 12px;">
+				<ul style="list-style: disc; margin-left: 2em;">
+					<li>各編集画面での記事CA・広告CA・埋め込みCA（第三者コンテンツの自己宣言）発行</li>
+					<li>全ての固定ページ・投稿ページの一括記事CA発行</li>
+					<li>Xでの記事ブロックCAのシェアサポート<br>
+						<span class="description">※別途、検証用のChrome拡張機能が必要です。</span>
+					</li>
+					<li>CAプロパティ <code>genre</code> を使ったコンテキスト広告配信</li>
+				</ul>
+
+				<p>
+					CA発行時には、<code>TextTargetIntegrity</code> と
+					<code>ExternalResourceTargetIntegrity</code> の発行を自動的に行います。
+				</p>
+
+				<p>
+					<code>TextTargetIntegrity</code> の検証時において、HTML実体参照などによる文字列表現差異で、
+					拡張機能エラー（不要な不一致検知）が発生しないよう、
+					CAサーバー登録時に対象文字列の正規化処理にも対応しています。
+				</p>
+
+				<p>
+					また、画像の <code>ExternalResourceTargetIntegrity</code> 発行時には、
+					<code>srcset</code> に含まれる複数画像候補に対して、自動的に複数のハッシュ値を発行します。
+				</p>
+
+				<p>
+					上記の発行時には、対象CSSセレクターに <code>#op-body-*</code> の形式で
+					id 属性を自動付与します。
+				</p>
+			</div>
+		</details>
 		<p>
 			<strong>⚠️ 重要な注意事項：</strong>
 			WordPressの
@@ -370,7 +428,8 @@ function profile_ca_server_admin_secret_field() {
 	<?php
 }
 
-/** 検証対象の種別フィールド */
+/** 検証対象の種別フィールド　 */
+/*
 function profile_ca_target_type_field() {
 	?>
 		<input
@@ -389,8 +448,9 @@ function profile_ca_target_type_field() {
 		</datalist>
 	<?php
 }
-
+*/
 /** 検証対象要素CSSセレクターフィールド */
+/*
 function profile_ca_target_css_selector_field() {
 	?>
 		<input
@@ -403,6 +463,7 @@ function profile_ca_target_css_selector_field() {
 		>
 	<?php
 }
+*/
 
 /** 検証対象要素の存在するHTML */
 function profile_ca_target_html_field() {
