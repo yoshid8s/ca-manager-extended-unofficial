@@ -45,7 +45,7 @@ WordPress上での実運用を想定して拡張した実装です。
 v0.4.6 では、srcset/currentSrc を持たない WordPress の Latest Posts サムネイル画像に対して、複数 integrity を付与すると検証失敗するケースを修正しました。
 srcset を持たない画像については、単一 integrity を利用するよう改善しています。
 
-なお、専用ビルダー環境（v0.4.7-colibri-beta1）も開発済みですが、その他の環境での動作確認を行なっていないため、最新版（v0.4.6）をご利用ください。
+なお、専用ビルダー環境（v0.4.7-colibri-beta1）も開発済みですが、その他の環境での動作確認を行なっていないため、最新版（v0.4.8）をご利用ください。
 
 ## CA Manager Extension の適用範囲拡張バージョン：CAメタデータ連動広告管理（プロトタイプ）
 
@@ -305,7 +305,7 @@ The latest version now supports OP-based article block sharing for X (Twitter).
 v0.4.6 fixed an issue where applying multiple integrity values ​​to WordPress Latest Posts thumbnail images that did not have srcset/currentSrc would cause validation to fail.
 For images without srcset, it now uses a single integrity rating.
 
-Note that a dedicated builder environment (v0.4.7-colibri-beta1) has also been developed, but since its operation has not been confirmed in other environments, please use the latest version (v0.4.6).
+Note that a dedicated builder environment (v0.4.7-colibri-beta1) has also been developed, but since its operation has not been confirmed in other environments, please use the latest version (v0.4.8).
 
 ## CA Manager Extension Application Scope Extended Version: CA Metadata-Linked Ad Management (Prototype)
 
