@@ -4,6 +4,9 @@
 
 本プラグインは、WordPress（WP）向けのContent Attestation（CA）発行・検証対応プラグインです。
 
+<img width="791" height="678" alt="image" src="https://github.com/user-attachments/assets/769ab418-68b9-4dbf-95de-cb17bd2e95b0" />
+
+
 * WP以外のCMS環境では、[Concrete CMSの最小実装プラグイン](https://github.com/yoshid8s/concrete-ca-manager)があります。
 
 本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったもので、<br>
@@ -258,6 +261,9 @@ MIT License
 
 # ca-manager-extension
 This plugin is a WordPress plugin that supports Content Attestation (CA) issuance and verification.
+
+<img width="791" height="678" alt="image" src="https://github.com/user-attachments/assets/093ff32d-bb08-490d-86dd-8144e19baf89" />
+
 
 * For CMS environments other than WordPress, there is the [Concrete CMS Minimal Implementation Plugin](https://github.com/yoshid8s/concrete-ca-manager).
 
