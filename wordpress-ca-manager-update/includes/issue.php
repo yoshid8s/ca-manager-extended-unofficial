@@ -275,6 +275,28 @@ function cam_get_posts_without_main_article_ca(): array {
 }
 
 /**
+ * 記事CA対象の全公開投稿IDを取得
+ *
+ * - 発行済みも含む
+ *
+ * @return array
+ */
+function cam_get_all_public_posts_for_article_ca(): array {
+	$posts = \get_posts(
+		array(
+			'post_type'      => array( 'post', 'page' ),
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'orderby'        => 'ID',
+			'order'          => 'ASC',
+		)
+	);
+
+	return \array_map( 'absint', $posts );
+}
+
+/**
  * payload が main記事CAの特徴を満たすか判定
  *
  * main記事CAの特徴:
@@ -344,8 +366,10 @@ function cam_should_skip_bulk_article_ca_post( int $post_id ): bool {
 /**
  * 記事CAの検証失敗リスクを簡易判定
  *
- * これは確定判定ではなく、HTML実体参照や引用符など、
- * ハッシュ不一致を起こしやすい文字を含む場合に注意扱いとする。
+ * HTML entity / & / apostrophe は
+ * 正規化対応済みのため warning 対象外。
+ *
+ * 動的DOM変化を起こしやすい要素のみ warning 対象とする。
  *
  * @param \WP_Post $post Post object.
  * @return array
@@ -357,19 +381,22 @@ function cam_detect_article_ca_warning_reasons( \WP_Post $post ): array {
 	$content = (string) $post->post_content;
 	$body    = $title . "\n" . $content;
 
-	// HTML entity
-	if ( preg_match( '/&(?:[a-zA-Z][a-zA-Z0-9]+|#\d+|#x[0-9A-Fa-f]+);/', $body ) ) {
-		$reasons[] = 'HTML実体参照を含む';
+	// iframe
+	if ( false !== stripos( $body, '<iframe' ) ) {
+		$reasons[] = 'iframe を含む';
 	}
 
-	// 単純な引用符・アポストロフィ・曲線引用符
-	if ( preg_match( '/["\']|[’‘“”]/u', $body ) ) {
-		$reasons[] = '引用符/アポストロフィを含む';
+	// script
+	if ( false !== stripos( $body, '<script' ) ) {
+		$reasons[] = 'script を含む';
 	}
 
-	// ampersand
-	if ( false !== strpos( $body, '&' ) ) {
-		$reasons[] = '& を含む';
+	// Swiper / slider 系
+	if (
+		false !== stripos( $body, 'swiper' ) ||
+		false !== stripos( $body, 'slider' )
+	) {
+		$reasons[] = 'Swiper / slider 系要素を含む';
 	}
 
 	return array_values( array_unique( $reasons ) );
@@ -840,6 +867,8 @@ function cam_handle_bulk_issue_article_ca() {
 
 	\check_admin_referer( 'cam_bulk_issue_article_ca_action', 'cam_bulk_issue_article_ca_nonce' );
 
+	$force_reissue = ! empty( $_POST['cam_force_reissue_article_ca'] );
+
 	$editor_name = isset( $_POST['cam_bulk_editor_name'] )
 		? \sanitize_text_field( \wp_unslash( $_POST['cam_bulk_editor_name'] ) )
 		: '';
@@ -848,7 +877,9 @@ function cam_handle_bulk_issue_article_ca() {
 		? \sanitize_text_field( \wp_unslash( $_POST['cam_bulk_author_name'] ) )
 		: '';
 
-	$post_ids = cam_get_posts_without_main_article_ca();
+	$post_ids = $force_reissue
+	? cam_get_all_public_posts_for_article_ca()
+	: cam_get_posts_without_main_article_ca();
 
 	$total    = \count( $post_ids );
 	$success  = 0;
@@ -877,7 +908,7 @@ function cam_handle_bulk_issue_article_ca() {
 			continue;
 		}
 
-		if ( cam_has_main_article_ca( $post_id ) ) {
+		if ( ! $force_reissue && cam_has_main_article_ca( $post_id ) ) {
 			$skipped++;
 			continue;
 		}
@@ -2740,8 +2771,8 @@ function create_uca_list( \WP_Post $post, string $issuer_id ): array {
 			url: $permalink,
 			locale: $locale,
 			html: $main_html,
-			target_type: \get_option( 'profile_ca_target_type', PROFILE_DEFAULT_CA_TARGET_TYPE ),
-			target_css_selector: \get_option( 'profile_ca_target_css_selector', PROFILE_DEFAULT_CA_TARGET_CSS_SELECTOR ),
+			target_type: 'TextTargetIntegrity',
+			target_css_selector: '#op-body-*',
 			external_resources: $main_external_resources,
 			headline: $post->post_title,
 			description: \has_excerpt( $post ) ? \get_the_excerpt( $post ) : '',
