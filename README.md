@@ -230,8 +230,10 @@ CMS環境で実装可能にするためのリファレンス実装です。
 
 ```bash
 git clone https://github.com/yoshid8s/ca-manager-extension.git
-WordPressの `wp-content/plugins/` に配置し、管理画面から有効化してください。
 ```
+
+WordPressの `wp-content/plugins/` に配置し、
+管理画面から有効化してください。
 
 ### 方法②（手動）
 
@@ -322,15 +324,20 @@ This plugin automatically displays contextually relevant ads based on article co
 
 ```mermaid
 flowchart TD
-    A["Ad Application<br/>Advertiser / Genre / Bid Price"]
+    A["Ad Application"]
     B["Application Data Storage"]
-    C["Contextual Ad Generation<br/>(CA Issued)"]
+    C["Contextual Ad Generation"]
     D["Article Display"]
-    E["Content Analysis<br/>Genre / Body Text"]
-    F["Ad Matching<br/>+ Scoring"]
+    E["Content Analysis"]
+    F["Ad Matching"]
     G["Optimal Ad Display"]
 
-    A --> B --> C --> D --> E --> F --> G
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
 ```
 
 ---
@@ -489,9 +496,10 @@ This ensures the stability of validation.
 ### Method 1 (For Developers)
 
 ```bash
-git clone https://github.com/yoshid8s/ca-manager-extension.git
-Place it in `wp-content/plugins/` in WordPress and activate it from the admin screen.
+git clone https://github.com/yoshid8s/ca-manager-extended-unofficial.git
 ```
+
+Place it in `wp-content/plugins/` in WordPress and activate it from the admin screen.
 
 ### Method 2 (Manual)
 
