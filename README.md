@@ -1,4 +1,4 @@
-# ca-manager-extension
+# ca-manager-extended-unofficial
 🇺🇸 For English readers:
 [Jump to English version](#english)
 
