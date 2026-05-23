@@ -11,26 +11,29 @@ The CA Manager extension was developed to support the practical operation of web
 
 After completing the above main objective, I attempted an experimental implementation of OP contextual advertising using OP metadata.
 
-The reason is that even if OP is implemented on a website, browsers cannot currently recognize OP-implemented sites and guide users to them as more trustworthy than sites without OP.
+The reason is that even if OP (Open Content) is implemented on a website, browsers cannot currently recognize OP-implemented sites and guide users to them as more trustworthy than sites without OP. Therefore, implementing OP offers no benefit to website operators.
 
-Implementing OP offers no benefit to website operators.
+However, contextual ad delivery using OP properties allows ads to be displayed as part of the web article viewed by the user, regardless of the browser, based on the website's system settings. This has the potential to improve the user's web experience.
 
-However, contextual ad delivery using OP properties allows ads to be displayed as part of the web articles viewed by users, regardless of the browser, based on the website's system settings, potentially making the user's web experience more comfortable.
+OP contextual ads are implemented by linking the `genre` property of the article CA (Coverage Ad) and the ad CA (Advertisement Ad), resulting in the following value:
 
-OP contextual advertising is achieved by linking the `genre` property of article CA and OnilenAd CA, resulting in the following value: <br/>
+1. Advertisements can be presented to web page visitors as part of the web information relevant to the article.
+2. As a result, attention to advertisements increases, improving ad awareness and click-through rates.
+3. Because advertisements do not interfere with the article, the readership of the article itself improves.
 
-- Visitors to a webpage can see the advertisements offered there as part of the web information relevant to the article.
-- As a result, attention to the advertisements increases, improving ad awareness and click-through rates.
-- Because the advertisements do not interfere with the article, the rate of in-depth reading of the article itself improves.
+In fact, the average click-through rate for 12 advertisements placed on my own blog [JiJi Style](https://style.yh-inc.jp/), where contextual advertising was implemented, was 19.2% (results after approximately one month of implementation).
 
-In fact, the average click-through rate of the 12 advertisements placed on my own blog [JiJi Style](https://style.yh-inc.jp/) where contextual advertising is implemented is 19.2% (results after approximately one month of implementation).
+Paper-based newspapers and magazines treated advertisements, like articles, as one of the contents they provided, and vetted advertisers and advertising content.
 
-<br/>
-After completing the above development, I confirmed that the sender information of the OP attached to my website<br/>
-works effectively even on third-party platforms by extending the web standard technology OGP<br/>
-by posting some blocks of web pages to X.
+However, in digital media, media outlets have outsourced ad delivery functions to platforms, relinquishing their control over ad delivery on articles based on their own media policies.
 
-To confirm this, I separately developed a browser extension [OGP CA Extension](https://github.com/yoshid8s/ogp-ca-extension/tree/main).
+As a result, advertisements have become an obstacle to the article, leading to a decrease in the informational value of the advertisements themselves, such as banner blindness.
+
+The positive experimental results of implementing OP contextual advertising suggest that OP contextual advertising can solve this problem.
+
+After completing the development of the above-mentioned OP contextual ads, I confirmed that the sender information of the OPs attached to my website also functions effectively on third-party platforms by extending the web standard technology OGP, by posting some blocks of web pages to X.
+
+To verify this, I separately developed a browser extension [OGP CA extension](https://github.com/yoshid8s/ogp-ca-extension/tree/main).
 
 ## Positioning of this Report
 
@@ -272,6 +275,8 @@ This feature embeds OGP metadata, which has been specially extended for OPs, int
 - `og:op:cas`
 - Generating shared pages in the format `/op-share/{hash}`
 - OGP meta output for `TextBlockAttestation`
+
+To verify this, I separately developed a browser extension [OGP CA extension](https://github.com/yoshid8s/ogp-ca-extension/tree/main).
 
 ### 4.9 Extended Image Integrity Processing
 
@@ -704,6 +709,7 @@ OGPメタデータがHTMLに埋め込まれます。<br/>
 - `/op-share/{hash}` 形式の共有ページ生成
 - `TextBlockAttestation` 用のOGPメタ出力
 
+その確認のために、ブラウザ拡張機能[OGP CA拡張機能](https://github.com/yoshid8s/ogp-ca-extension/tree/main)を別途開発しました。
 
 ### 4.9 画像integrity処理の拡張
 
