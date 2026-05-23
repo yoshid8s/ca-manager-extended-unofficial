@@ -342,7 +342,7 @@ function profile_settings_section() {
 					<li>各編集画面での記事CA・広告CA・埋め込みCA（第三者コンテンツの自己宣言）発行</li>
 					<li>全ての固定ページ・投稿ページの一括記事CA発行</li>
 					<li>Xでの記事ブロックCAのシェアサポート<br>
-						<span class="description">※別途、検証用のChrome拡張機能が必要です。</span>
+						<span class="description">※別途、<a href="https://github.com/yoshid8s/opg-ca-extension/blob/main/README.md" target="_blank">検証用のChrome拡張機能</a>が必要です。</span>
 					</li>
 					<li>CAプロパティ <code>genre</code> を使ったコンテキスト広告配信</li>
 				</ul>
