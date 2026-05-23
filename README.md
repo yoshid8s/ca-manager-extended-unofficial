@@ -1,268 +1,6 @@
 # ca-manager-extended-unofficial
-🇺🇸 For English readers:
-[Jump to English version](#english)
-
-本プラグインは、WordPress（WP）向けのContent Attestation（CA）発行・検証対応プラグインです。
-
-<img width="791" height="678" alt="image" src="https://github.com/user-attachments/assets/769ab418-68b9-4dbf-95de-cb17bd2e95b0" />
-
-
-* WP以外のCMS環境では、[Concrete CMSの最小実装プラグイン](https://github.com/yoshid8s/concrete-ca-manager)があります。
-
-本実装は、OP-CIP提供の公式CA Manager（v0.4.3）をベースに独立して実験的に拡張を行ったもので非公式バージョンです。<br>
-公式版との差分レポートをまとめていますので、[こちらを参照](https://github.com/yoshid8s/ca-manager-extended-unofficial/blob/main/docs/difference_from_original.md)してください。<br>
-<br>
-記事CAと広告配信を連動させたコンテキスト広告システムを実装しています。<br>
-<br>
-広告CAは本来、広告主が署名することが想定されていますが、<br>
-本実装では、広告配信と記事CAの連動モデルを示すために、<br>
-<br>
-メディア側で広告CAを発行する構成を採用しています。<br>
-これは、広告主・メディア間の信頼関係に基づく実運用を想定したモデルの一例です。<br>
-<br>
-これは、広告主側でのOP/CA実装の負担を考慮した暫定的な設計であり、<br>
-OPが普及した段階では、広告主自身によるCA発行との連携を前提としています。
-
-## Compatibility
-
-本プラグインは、従来型（クラシック）テーマを前提として実装されています。
-
-動作確認済み：
-- Chic
-- Twenty Eleven
-- ドラッグ＆ドロップ型の専用ビルダー（Colibri）
-
-専用ビルダー環境のColibriでは、動作確認済みですが、
-その他の専用ビルダーでは、DOM構造の違いにより正常に動作しない可能性があり、
-今後の対応が必要です。
-
-# CA Manager Extension 
-
-CA Manager（v0.4.3）をベースに、
-WordPress上での実運用を想定して拡張した実装です。
-
-最新版（v0.4.8）は [Releases](https://github.com/yoshid8s/ca-manager-extension/releases) からダウンロードできます。
-最新版では、X（Twitter）向けの OPベース記事ブロック共有機能にも対応しました。
-
-v0.4.6 では、srcset/currentSrc を持たない WordPress の Latest Posts サムネイル画像に対して、複数 integrity を付与すると検証失敗するケースを修正しました。
-srcset を持たない画像については、単一 integrity を利用するよう改善しています。
-
-なお、専用ビルダー環境（v0.4.7-colibri-beta1）も開発済みですが、その他の環境での動作確認を行なっていないため、最新版（v0.4.8）をご利用ください。
-
-## CA Manager Extension の適用範囲拡張バージョン：CAメタデータ連動広告管理（プロトタイプ）
-
-- v0.4.6-1では、Content Attestation（CA）のメタデータを活用したコンテキスト広告管理機能（初期開発版）を追加しました。記事のgenreと本文内容に基づき、広告をマッチング・表示・計測する仕組みです。
-- v0.4.7-colibri-beta1では、コンテンツ認証 (CA) 検証のための 専用ビルダーColibri 固有の互換性レイヤーを導入しました。Colibri ベースの WordPress サイトでのテスト中に、Swiper が swiper-slide-duplicate を使用してスライダーの DOM 要素を内部的に複製していたため、一部のページで CA 検証が失敗することが判明したため、Swiper によって生成された重複スライドから重複した op-body-* ID を削除するフロントエンド対策を追加しました。
-
-## コンテキスト広告の仕組み
-
-本プラグインでは、記事内容および広告申込データに基づき、コンテキストに適した広告を自動表示します。
-
-### 全体フロー
-
----
-
-```mermaid
-flowchart TD
-    A[広告申込<br>広告主 / genre / 入札価格]
-    B[申込データ保存]
-    C[コンテキスト広告生成<br>（CA発行）]
-    D[記事表示]
-    E[コンテンツ解析<br>genre・本文]
-    F[広告マッチング<br>＋スコアリング]
-    G[最適広告表示]
-
-    A --> B --> C --> D --> E --> F --> G
-```
-
----
-
-### 広告選択ロジック
-
-コンテキスト広告は以下の条件で選択されます。
-
-- 記事の `genre` と広告の `genre` が一致
-- 掲載期間内である
-- 有効化されている広告である
-- 記事本文に広告主名が含まれる場合はスコア加算
-- （将来）入札価格（bid_price）による優先順位付け
-
----
-
-### 特徴
-
-- 広告申込データをそのまま配信ロジックに反映
-- CMS内で完結する広告管理
-- コンテンツと広告の意味的整合性を担保
-- 将来的な入札型広告（オークションモデル）に対応可能
-
----
-
-### 実装例
-
-ファッションブログ「JiJi Style」
-https://style.yh-inc.jp/ <br>
-（実際にコンテキスト広告と記事CAが連動して動作しています）
-
-- スーツに関するページには、スーツブランドの広告が表示され
-- カジュアルウェアに関するページには、カジュアルブランドの広告が表示されます。  
-→ 記事 genre と同じ genre の広告のみ表示対象  
-→ 記事内に特定ブランド名が含まれる場合は、該当ブランドが優先表示されます。  
-
----
-
-### 今後の拡張
-
-- 入札価格ベースの広告ランキング
-- 複数広告のオークション選択
-- CTR・表示回数ベースの最適化
-
-
-詳しくは以下のリリースをご覧ください。
-
-- https://github.com/yoshid8s/ca-manager-extension/releases/tag/v0.4.6-1
-
-## 主な機能
-- 投稿単位でのCA管理
-- 広告CA（OnlineAd）
-- 埋め込みコンテンツCA
-- 記事CAの一括発行機能
-- 複数記事に対するCA発行
-- コンテキスト広告管理機能
-- UIイメージ例（下図）
-
-## 管理画面（設定・一括発行）
-CA設定および記事CAの一括発行を行う管理画面です。
-<img width="536" height="542" alt="image" src="https://github.com/user-attachments/assets/eb99ffdf-da5d-4062-b24b-3422214bd418" />
-
-## 編集画面例（個別CA管理）
-編集ページで個別にCA発行を行う画面です。記事CAだけでなく、広告CAや第三者からの引用テキストCA・引用画像CAも発行できます。
-<img width="1458" height="417" alt="image" src="https://github.com/user-attachments/assets/aa652fb6-77c4-4924-93ba-b69fdb4183b1" />
-
-## 位置付け
-本実装は、OPにおける「個別セレクター単位でのCA発行」という前提を、
-CMS環境で実装可能にするためのリファレンス実装です。
-
-## 対象ユーザー
-
-- WordPressサイト運営者
-- コンテンツの真正性・出所を証明したい開発者
-- Content Attestation（CA）やOPに関心のある技術者
-
-## 目次
-
-- [主な機能](#主な機能)
-- [更新履歴](#更新履歴)
-- [画像Integrity処理について](#画像integrity処理について)
-- [インストール方法](#インストール方法)
-- [使い方](#使い方)
-
-## CA Manager Extension (v0.4.3-2)
-
-バグ修正しました。更新履歴を参照ください。
-
-## Latest update (v0.4.4-1)
-
-- 記事CAの一括発行機能を追加
-- 複数記事に対するCA発行の安定性を改善
-
----
-
-## 主な機能
-
-- 記事本文のCA発行（TextTargetIntegrity）
-- 埋め込み画像のCA発行（ExternalResourceTargetIntegrity）
-- 広告コンテンツのCA発行
-- WordPress編集画面からCA管理
-- CAS（application/cas+json）の自動埋め込み
-- 記事CAの一括発行機能
-- 複数記事に対するCA発行
-
----
-
-## 更新履歴
-
-### v0.4.4-1（2026-04）
-
-- 記事CAの一括発行機能を追加
-- 複数記事に対するCA発行の安定性を改善
-
-### v0.4.3-2（2026-04）
-
-#### バグ修正
-
-**1. srcset画像のExternalResourceTargetIntegrity修正**
-- `srcset` による複数ハッシュを分割していた問題を修正
-- 各画像の `integrity` 属性を1つの値として扱うように変更
-
-**2. 記事CAに画像が含まれない問題**
-- main article CA に `external_resources` が渡されていなかった不具合を修正
-- 埋め込み画像CAが無い場合、記事CAに画像整合情報が含まれるよう改善
-
-**3. CA間の整合性修正**
-- 以下の処理を統一：
-  - 記事CA
-  - 埋め込み画像CA
-  - 広告CA
-- 検証エラーの原因となる不整合を解消
-
----
-
-## 画像Integrity処理について
-
-本プラグインでは、`<img>`タグの `integrity` 属性に複数のハッシュ値が含まれる場合（例：srcset）でも、
-それらを分割せず、1つのintegrity値として扱います。
-
-- integrity値はそのまま1つの文字列として使用
-- 個別ハッシュに分割しない
-- 対象：
-  - 記事CA
-  - 埋め込み画像CA
-  - 広告CA
-
-これにより、検証の安定性を確保しています。
-
----
-
-## インストール方法
-
-### 方法①（開発者向け）
-
-```bash
-git clone https://github.com/yoshid8s/ca-manager-extension.git
-```
-
-WordPressの `wp-content/plugins/` に配置し、
-管理画面から有効化してください。
-
-### 方法②（手動）
-
-リポジトリをダウンロード
-フォルダをZIP化
-WordPress管理画面からアップロード
-
-### 使い方
-
-- 投稿編集画面を開く。
-- CAマネージャーで対象コンテンツを選択。
-- 保存するとCASが自動生成される。
-
-### 注意事項
-
-srcsetを含む画像はブラウザ実DOMと一致する必要があります。
-HTML構造の変更は検証エラーの原因になります。
-
-### 作者
-
-Yoshifumi Takeuchi
-
-## License: 
-
-MIT License
-
-<a id="english"></a>
-
-# English Version
+🇺🇸 For Japanese readers:
+[Jump to Japanese version](#japanese)
 
 # ca-manager-extension
 This plugin is a WordPress plugin that supports Content Attestation (CA) issuance and verification.
@@ -533,3 +271,266 @@ This project is based on the official CA Manager developed by the Originator Pro
 ## Notice
 
 This project is based on the official CA Manager developed by the Originator Profile (OP) project, with additional modifications and extensions.
+
+<a id="japanese"></a>
+
+# Japanese Version
+
+本プラグインは、WordPress（WP）向けのContent Attestation（CA）発行・検証対応プラグインです。
+
+<img width="791" height="678" alt="image" src="https://github.com/user-attachments/assets/769ab418-68b9-4dbf-95de-cb17bd2e95b0" />
+
+
+* WP以外のCMS環境では、[Concrete CMSの最小実装プラグイン](https://github.com/yoshid8s/concrete-ca-manager)があります。
+
+本実装は、OP-CIP提供の公式CA Manager（v0.4.3）をベースに独立して実験的に拡張を行ったもので非公式バージョンです。<br>
+公式版との差分レポートをまとめていますので、[こちらを参照](https://github.com/yoshid8s/ca-manager-extended-unofficial/blob/main/docs/difference_from_original.md)してください。<br>
+<br>
+記事CAと広告配信を連動させたコンテキスト広告システムを実装しています。<br>
+<br>
+広告CAは本来、広告主が署名することが想定されていますが、<br>
+本実装では、広告配信と記事CAの連動モデルを示すために、<br>
+<br>
+メディア側で広告CAを発行する構成を採用しています。<br>
+これは、広告主・メディア間の信頼関係に基づく実運用を想定したモデルの一例です。<br>
+<br>
+これは、広告主側でのOP/CA実装の負担を考慮した暫定的な設計であり、<br>
+OPが普及した段階では、広告主自身によるCA発行との連携を前提としています。
+
+## Compatibility
+
+本プラグインは、従来型（クラシック）テーマを前提として実装されています。
+
+動作確認済み：
+- Chic
+- Twenty Eleven
+- ドラッグ＆ドロップ型の専用ビルダー（Colibri）
+
+専用ビルダー環境のColibriでは、動作確認済みですが、
+その他の専用ビルダーでは、DOM構造の違いにより正常に動作しない可能性があり、
+今後の対応が必要です。
+
+# CA Manager Extension 
+
+CA Manager（v0.4.3）をベースに、
+WordPress上での実運用を想定して拡張した実装です。
+
+最新版（v0.4.8）は [Releases](https://github.com/yoshid8s/ca-manager-extension/releases) からダウンロードできます。
+最新版では、X（Twitter）向けの OPベース記事ブロック共有機能にも対応しました。
+
+v0.4.6 では、srcset/currentSrc を持たない WordPress の Latest Posts サムネイル画像に対して、複数 integrity を付与すると検証失敗するケースを修正しました。
+srcset を持たない画像については、単一 integrity を利用するよう改善しています。
+
+なお、専用ビルダー環境（v0.4.7-colibri-beta1）も開発済みですが、その他の環境での動作確認を行なっていないため、最新版（v0.4.8）をご利用ください。
+
+## CA Manager Extension の適用範囲拡張バージョン：CAメタデータ連動広告管理（プロトタイプ）
+
+- v0.4.6-1では、Content Attestation（CA）のメタデータを活用したコンテキスト広告管理機能（初期開発版）を追加しました。記事のgenreと本文内容に基づき、広告をマッチング・表示・計測する仕組みです。
+- v0.4.7-colibri-beta1では、コンテンツ認証 (CA) 検証のための 専用ビルダーColibri 固有の互換性レイヤーを導入しました。Colibri ベースの WordPress サイトでのテスト中に、Swiper が swiper-slide-duplicate を使用してスライダーの DOM 要素を内部的に複製していたため、一部のページで CA 検証が失敗することが判明したため、Swiper によって生成された重複スライドから重複した op-body-* ID を削除するフロントエンド対策を追加しました。
+
+## コンテキスト広告の仕組み
+
+本プラグインでは、記事内容および広告申込データに基づき、コンテキストに適した広告を自動表示します。
+
+### 全体フロー
+
+---
+
+```mermaid
+flowchart TD
+    A[広告申込<br>広告主 / genre / 入札価格]
+    B[申込データ保存]
+    C[コンテキスト広告生成<br>（CA発行）]
+    D[記事表示]
+    E[コンテンツ解析<br>genre・本文]
+    F[広告マッチング<br>＋スコアリング]
+    G[最適広告表示]
+
+    A --> B --> C --> D --> E --> F --> G
+```
+
+---
+
+### 広告選択ロジック
+
+コンテキスト広告は以下の条件で選択されます。
+
+- 記事の `genre` と広告の `genre` が一致
+- 掲載期間内である
+- 有効化されている広告である
+- 記事本文に広告主名が含まれる場合はスコア加算
+- （将来）入札価格（bid_price）による優先順位付け
+
+---
+
+### 特徴
+
+- 広告申込データをそのまま配信ロジックに反映
+- CMS内で完結する広告管理
+- コンテンツと広告の意味的整合性を担保
+- 将来的な入札型広告（オークションモデル）に対応可能
+
+---
+
+### 実装例
+
+ファッションブログ「JiJi Style」
+https://style.yh-inc.jp/ <br>
+（実際にコンテキスト広告と記事CAが連動して動作しています）
+
+- スーツに関するページには、スーツブランドの広告が表示され
+- カジュアルウェアに関するページには、カジュアルブランドの広告が表示されます。  
+→ 記事 genre と同じ genre の広告のみ表示対象  
+→ 記事内に特定ブランド名が含まれる場合は、該当ブランドが優先表示されます。  
+
+---
+
+### 今後の拡張
+
+- 入札価格ベースの広告ランキング
+- 複数広告のオークション選択
+- CTR・表示回数ベースの最適化
+
+
+詳しくは以下のリリースをご覧ください。
+
+- https://github.com/yoshid8s/ca-manager-extension/releases/tag/v0.4.6-1
+
+## 主な機能
+- 投稿単位でのCA管理
+- 広告CA（OnlineAd）
+- 埋め込みコンテンツCA
+- 記事CAの一括発行機能
+- 複数記事に対するCA発行
+- コンテキスト広告管理機能
+- UIイメージ例（下図）
+
+## 管理画面（設定・一括発行）
+CA設定および記事CAの一括発行を行う管理画面です。
+<img width="536" height="542" alt="image" src="https://github.com/user-attachments/assets/eb99ffdf-da5d-4062-b24b-3422214bd418" />
+
+## 編集画面例（個別CA管理）
+編集ページで個別にCA発行を行う画面です。記事CAだけでなく、広告CAや第三者からの引用テキストCA・引用画像CAも発行できます。
+<img width="1458" height="417" alt="image" src="https://github.com/user-attachments/assets/aa652fb6-77c4-4924-93ba-b69fdb4183b1" />
+
+## 位置付け
+本実装は、OPにおける「個別セレクター単位でのCA発行」という前提を、
+CMS環境で実装可能にするためのリファレンス実装です。
+
+## 対象ユーザー
+
+- WordPressサイト運営者
+- コンテンツの真正性・出所を証明したい開発者
+- Content Attestation（CA）やOPに関心のある技術者
+
+## 目次
+
+- [主な機能](#主な機能)
+- [更新履歴](#更新履歴)
+- [画像Integrity処理について](#画像integrity処理について)
+- [インストール方法](#インストール方法)
+- [使い方](#使い方)
+
+## CA Manager Extension (v0.4.3-2)
+
+バグ修正しました。更新履歴を参照ください。
+
+## Latest update (v0.4.4-1)
+
+- 記事CAの一括発行機能を追加
+- 複数記事に対するCA発行の安定性を改善
+
+---
+
+## 主な機能
+
+- 記事本文のCA発行（TextTargetIntegrity）
+- 埋め込み画像のCA発行（ExternalResourceTargetIntegrity）
+- 広告コンテンツのCA発行
+- WordPress編集画面からCA管理
+- CAS（application/cas+json）の自動埋め込み
+- 記事CAの一括発行機能
+- 複数記事に対するCA発行
+
+---
+
+## 更新履歴
+
+### v0.4.4-1（2026-04）
+
+- 記事CAの一括発行機能を追加
+- 複数記事に対するCA発行の安定性を改善
+
+### v0.4.3-2（2026-04）
+
+#### バグ修正
+
+**1. srcset画像のExternalResourceTargetIntegrity修正**
+- `srcset` による複数ハッシュを分割していた問題を修正
+- 各画像の `integrity` 属性を1つの値として扱うように変更
+
+**2. 記事CAに画像が含まれない問題**
+- main article CA に `external_resources` が渡されていなかった不具合を修正
+- 埋め込み画像CAが無い場合、記事CAに画像整合情報が含まれるよう改善
+
+**3. CA間の整合性修正**
+- 以下の処理を統一：
+  - 記事CA
+  - 埋め込み画像CA
+  - 広告CA
+- 検証エラーの原因となる不整合を解消
+
+---
+
+## 画像Integrity処理について
+
+本プラグインでは、`<img>`タグの `integrity` 属性に複数のハッシュ値が含まれる場合（例：srcset）でも、
+それらを分割せず、1つのintegrity値として扱います。
+
+- integrity値はそのまま1つの文字列として使用
+- 個別ハッシュに分割しない
+- 対象：
+  - 記事CA
+  - 埋め込み画像CA
+  - 広告CA
+
+これにより、検証の安定性を確保しています。
+
+---
+
+## インストール方法
+
+### 方法①（開発者向け）
+
+```bash
+git clone https://github.com/yoshid8s/ca-manager-extension.git
+```
+
+WordPressの `wp-content/plugins/` に配置し、
+管理画面から有効化してください。
+
+### 方法②（手動）
+
+リポジトリをダウンロード
+フォルダをZIP化
+WordPress管理画面からアップロード
+
+### 使い方
+
+- 投稿編集画面を開く。
+- CAマネージャーで対象コンテンツを選択。
+- 保存するとCASが自動生成される。
+
+### 注意事項
+
+srcsetを含む画像はブラウザ実DOMと一致する必要があります。
+HTML構造の変更は検証エラーの原因になります。
+
+### 作者
+
+Yoshifumi Takeuchi
+
+## License: 
+
+MIT License
+
