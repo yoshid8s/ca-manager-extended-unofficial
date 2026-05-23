@@ -21,7 +21,7 @@ In fact, the average click-through rate of the 12 advertisements placed on my ow
 
 <br/>
 After completing the above development, I confirmed that the sender information of the OP attached to my website<br/>
-functions effectively even on third-party platforms by extending the web standard technology OGP<br/>
+works effectively even on third-party platforms by extending the web standard technology OGP<br/>
 by posting some blocks of web pages to X.
 
 To confirm this, I separately developed a browser extension [OGP CA Extension](https://github.com/yoshid8s/ogp-ca-extension/tree/main).
@@ -35,7 +35,7 @@ This report summarizes the differences between the official CA Manager (v0.4.3) 
 I developed this independently extended version of the CA Manager because, from the perspective of a WordPress user, the official version was difficult to use.
 
 For example:
-- It lacks the necessary consideration for "harmless tampering detection," which the provider should have addressed, resulting in frequent errors in the OP extension.
+- It lacks the necessary consideration for "harmless HTML rendering differences being detected as tampering" which the provider should have addressed, resulting in frequent errors in the OP extension.
 - CA issuance is not possible on a per-edit page basis.
 - Batch CA issuance is not possible when there are many pages.
 
@@ -43,7 +43,7 @@ And so on.
 
 If the official CA Manager is not user-friendly from a user's perspective,
 I believe that the number of websites implementing the OP will not increase, no matter how socially relevant the OP is.
-I hope that OP-CIP will refer to this report and implement user-friendly updates to the official CA Manager. <br/>
+I hope that OP-CIP will refer to this report when considering future user-friendly improvements to the official CA Manager. <br/>
 
 ## 1. Custom Extended Version Targeted in the Diff Report
 
@@ -187,7 +187,7 @@ As mentioned in "Embedded Content CA," this is a realistic solution given that n
 
 From the perspective of advertising sales, it is not realistic for OP-implemented media or advertising agencies to force advertisers to implement OP on their websites or ad data when proposing advertising on OP-implemented media.
 
-This is something I can confidently say based on my own experience as an advertising professional for over 30 years.
+This is based on my own experience of more than 30 years in advertising.
 
 As a realistic solution until OP becomes widespread, I hope OP-CIP will consider this idea.
 
@@ -251,7 +251,7 @@ Additional shortcodes:
 
 This model assigns ad application IDs per article, rather than using contextual matching.
 
-### 4.8 OGP / OPG Extension
+### 4.8 Extended OGP Metadata
 
 This is an experimental feature that takes X sharing and OGP extensions into consideration.<br/>
 The following has been added to `includes/post.php`: <br/>
@@ -280,12 +280,12 @@ Currently, if there is no srcset,<br/>
 ### 4.10 Colibri / Swiper Support
 
 The CA Manager extension was initially implemented in a free WordPress theme, but<br/>
-To gauge the difficulty of implementing OP in paid themes,<br/>
+to evaluate the practical difficulty of OP implementation in commercial themes,<br/>
 CA Manager support was added to Colibri Builder.
 
 <br/>
 When I installed the implementation confirmed in the free theme to Colibri,<br/>
-there were no major obstacles,<br/>
+there were no major implementation obstacles,<br/>
 however, in blocks where images automatically slide, duplicate image CAs were issued,<br/>
 and CA verification failed in some cases.
 
@@ -580,7 +580,7 @@ CAマネージャー拡張版では以下ファイルにおいて<br/>
 ### 4.4 OnlineAd / 広告CA対応
 
 この広告CAにおいても、「埋め込みコンテンツCA」同様のコンセプトで<br/>
-第三者（広告主）作成の広告画像を記事発信者が実在生を確認した広告主の広告であると<br/>
+第三者（広告主）作成の広告画像を記事発信者が実在性を確認した広告主の広告であると<br/>
 「自己宣言」する考え方で設計しています。<br/>
 <br/>
 `includes/class-uca.php` に`subject_type` を追加し、<br/>
@@ -664,7 +664,7 @@ CAマネージャーを広告配信/広告申込ワークフローまで拡張�
 
 コンテキスト一致ではなく、記事別に広告申込IDを割り当てるモデルです。
 
-### 4.8 OGP / OPG拡張
+### 4.8 OGPメタデータ拡張
 
 X共有やOGP拡張を視野に入れた実験的な機能で<br/>
 `includes/post.php` に以下が追加されています。<br/>
@@ -699,7 +699,7 @@ CAマネージャー拡張版は、無料のWordPressテーマで当初実装し
 有料テーマへのOP実装の難易度を図るために、<br/>
 Colibri Builder へのCAマネージャー対応を行いました。<br/>
 <br/>
-無料テームで実装確認したものをColibriに定期要したところ、<br/>
+無料テーマで実装確認したものをColibriに適用したところ、<br/>
 特に大きな障壁はありませんでしたが、<br/>
 画像が自動スライドするブロックで、画像CAが重複して発行され<br/>
 CA検証が失敗するケースがありました。<br/>
