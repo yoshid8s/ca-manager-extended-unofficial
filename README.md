@@ -10,7 +10,10 @@ This plugin is a WordPress plugin that supports Content Attestation (CA) issuanc
 
 * For CMS environments other than WordPress, there is the [Concrete CMS Minimal Implementation Plugin](https://github.com/yoshid8s/concrete-ca-manager).
 
-This implementation is an unofficial extended version based on the official CA Manager (v0.4.3) provided by OP-CIP, with independent experimental features and practical WordPress enhancements.
+This implementation is an unofficial extended version based on the official CA Manager (v0.4.3) provided by OP-CIP, with independent experimental features and practical WordPress enhancements.<br/>
+A report detailing the differences from the official version is available [here](https://github.com/yoshid8s/ca-manager-extended-unofficial/blob/main/docs/difference_from_original.md).
+<br>
+<br>
 
 It includes a contextual advertising system that links article CAs and ad delivery.
 
