@@ -3,7 +3,7 @@ For Japanese readers:
 
 # OP-CIP Official CA Manager v0.4.3 → Proprietary Extension Version Difference Summary Report
 
-This document summarizes the main differences between the official CA Manager v0.4.3 provided by [Originator Profile Collaboratice Innovation Partnership (OP-CIP)](https://github.com/originator-profile) and the CA Manager extension version v0.4.8-X-share.
+This document summarizes the main differences between the official CA Manager v0.4.3 provided by [Originator Profile Collaborative Innovation Partnership (OP-CIP)](https://github.com/originator-profile) and the CA Manager extension version v0.4.8-X-share.
 
 ## Development Objectives
 
@@ -37,7 +37,7 @@ To verify this, I separately developed a browser extension [OGP CA extension](ht
 
 ## Positioning of this Report
 
-This report summarizes the differences between the official CA Manager (v0.4.3) provided by [Originator Profile Collaboratice Innovation Partnership (OP-CIP)](https://github.com/originator-profile) and an unofficial extended version of the CA Manager that we have independently extended.
+This report summarizes the differences between the official CA Manager (v0.4.3) provided by [Originator Profile Collaborative Innovation Partnership (OP-CIP)](https://github.com/originator-profile) and an unofficial extended version of the CA Manager that we have independently extended.
 
 ## Background of Development
 
