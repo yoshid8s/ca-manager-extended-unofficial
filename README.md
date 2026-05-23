@@ -9,7 +9,7 @@
 
 * WP以外のCMS環境では、[Concrete CMSの最小実装プラグイン](https://github.com/yoshid8s/concrete-ca-manager)があります。
 
-本実装は、公式CA Manager（v0.4.3）をベースに独立して拡張を行ったもので、<br>
+本実装は、OP-CIP提供の公式CA Manager（v0.4.3）をベースに独立して実験的に拡張を行ったもので非公式バージョンです。<br>
 記事CAと広告配信を連動させたコンテキスト広告システムを実装しています。<br>
 <br>
 広告CAは本来、広告主が署名することが想定されていますが、<br>
@@ -269,7 +269,9 @@ This plugin is a WordPress plugin that supports Content Attestation (CA) issuanc
 
 * For CMS environments other than WordPress, there is the [Concrete CMS Minimal Implementation Plugin](https://github.com/yoshid8s/concrete-ca-manager).
 
-This implementation is an independent extension based on the official CA Manager (v0.4.3), and implements a contextual advertising system that links article CAs and ad delivery.
+This implementation is an unofficial extended version based on the official CA Manager (v0.4.3) provided by OP-CIP, with independent experimental features and practical WordPress enhancements.
+
+It includes a contextual advertising system that links article CAs and ad delivery.
 
 <br>
 While ad CAs are originally intended to be signed by advertisers,
