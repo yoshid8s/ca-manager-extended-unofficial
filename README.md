@@ -164,15 +164,10 @@ This implementation is a reference implementation to enable the implementation o
 - [Installation Instructions]
 - [How to Use]
 
-## CA Manager Extension (v0.4.3-2)
+## CA Manager Extension (v0.4.9-x-share)
 
-Bug fixes. Please refer to the update history.
-
-
-## Latest update (v0.4.4-1)
-
-- Added bulk CA issuance function for articles
-- Improved stability of CA issuance for multiple articles
+The latest version (v0.4.9-x-share) can be downloaded from [Releases](https://github.com/yoshid8s/ca-manager-extension/releases).
+The latest version now supports OP-based article block sharing for X (Twitter).
 
 ---
 
@@ -190,14 +185,11 @@ Bug fixes. Please refer to the update history.
 
 ## Update History
 
-### v0.4.4-1 (2026-04)
+For the latest update history, please refer to [Releases](https://github.com/yoshid8s/ca-manager-extended-unofficial/releases).
 
-- Added bulk CA issuance function for articles
-- Improved stability of CA issuance for multiple articles
+#### v0.4.3-2 (2026-04)
 
-### v0.4.3-2 (2026-04)
-
-#### Bug fixes
+#### Bug fixes in the initial development version
 
 **1. **Fixed ExternalResourceTargetIntegrity for srcset images**
 - Fixed an issue where multiple hashes from `srcset` were being split.
@@ -434,14 +426,10 @@ CMS環境で実装可能にするためのリファレンス実装です。
 - [インストール方法](#インストール方法)
 - [使い方](#使い方)
 
-## CA Manager Extension (v0.4.3-2)
+## CA Manager Extension (v0.4.9-x-share)
 
-バグ修正しました。更新履歴を参照ください。
-
-## Latest update (v0.4.4-1)
-
-- 記事CAの一括発行機能を追加
-- 複数記事に対するCA発行の安定性を改善
+最新バージョン（v0.4.9-x-share）は、[リリース](https://github.com/yoshid8s/ca-manager-extension/releases)からダウンロードできます。
+最新バージョンでは、X（Twitter）向けのOPベースの記事ブロック共有に対応しました。
 
 ---
 
@@ -459,14 +447,11 @@ CMS環境で実装可能にするためのリファレンス実装です。
 
 ## 更新履歴
 
-### v0.4.4-1（2026-04）
-
-- 記事CAの一括発行機能を追加
-- 複数記事に対するCA発行の安定性を改善
+最新の更新履歴は、[リリース](https://github.com/yoshid8s/ca-manager-extended-unofficial/releases)をご参照ください。
 
 ### v0.4.3-2（2026-04）
 
-#### バグ修正
+#### 初期開発版のバグ修正について
 
 **1. srcset画像のExternalResourceTargetIntegrity修正**
 - `srcset` による複数ハッシュを分割していた問題を修正
