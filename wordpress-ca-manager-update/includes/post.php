@@ -310,6 +310,7 @@ function render_op_share_page() {
 	echo '<meta property="og:op:type" content="TextBlockAttestation">';
 	echo '<meta property="og:op:block_hash" content="' . \esc_attr( $hash ) . '">';
 	echo '<meta property="og:op:cas" content="' . \esc_url( $cas_url ) . '">';
+	echo '<meta property="og:op:block_text" content="' . \esc_attr( $text ) . '">';
 	echo '</head>';
 	echo '<body>';
 	echo '<h1>OPを使って、Xで共有されたWeb記事のブロック（段落）</h1>';
