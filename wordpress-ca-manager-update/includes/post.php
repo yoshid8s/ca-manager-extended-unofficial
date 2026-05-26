@@ -23,6 +23,8 @@ function init() {
 	\add_filter( 'query_vars', '\Profile\Post\add_op_share_query_vars' );
 	\add_action( 'template_redirect', '\Profile\Post\render_op_share_page' );
 
+	\add_action( 'rest_api_init', '\Profile\Post\register_op_share_rest_api' );
+
 	\add_filter( 'render_block_core/image', '\Profile\Post\block_image', 10, 2 );
 	\add_filter( 'the_content', '\Profile\Post\inject_integrity_into_content_images', 20 );
 	\add_filter( 'the_content', '\Profile\Post\add_ids_to_content_paragraphs', 30 );
@@ -258,70 +260,102 @@ function add_op_share_query_vars( $vars ) {
 	return $vars;
 }
 
+/**
+ * Render OP Share page.
+ */
 function render_op_share_page() {
 	$hash = \get_query_var( 'op_share_hash' );
 
-	if ( empty( $hash ) ) {
+	if ( ! $hash ) {
 		return;
 	}
 
-	$hash = \preg_replace( '/[^a-zA-Z0-9_-]/', '', $hash );
+	$hash = \sanitize_text_field( $hash );
 
-	$text   = isset( $_GET['text'] ) ? \trim( \wp_strip_all_tags( \wp_unslash( $_GET['text'] ) ) ) : '';
-	$title  = isset( $_GET['title'] ) ? \trim( \wp_strip_all_tags( \wp_unslash( $_GET['title'] ) ) ) : '';
-	$source = isset( $_GET['source'] ) ? \esc_url_raw( \wp_unslash( $_GET['source'] ) ) : '';
-	$author = isset( $_GET['author'] ) ? \trim( \wp_strip_all_tags( \wp_unslash( $_GET['author'] ) ) ) : '';
+	$data = \get_option( 'opg_share_' . $hash );
+
+	if ( ! is_array( $data ) ) {
+		$data = array();
+	}
+
+	$text = isset( $data['text'] ) ? (string) $data['text'] : '';
 
 	if ( '' === $text ) {
 		$text = 'この文章ブロックには OP/CAS による発信主体情報が付与されています。';
 	}
 
-	if ( '' === $title ) {
-		$title = '元記事タイトル未取得';
+	$title = isset( $data['title'] ) && '' !== $data['title']
+		? (string) $data['title']
+		: '共有された本文ブロック';
+
+	$author = isset( $data['author'] ) && '' !== $data['author']
+		? (string) $data['author']
+		: 'Yoshifumi Takeuchi';
+
+	$source = isset( $data['source'] ) ? (string) $data['source'] : '';
+
+	$cas_url = isset( $data['cas_url'] ) ? (string) $data['cas_url'] : '';
+
+	if ( '' === $cas_url && ! empty( $data['post_id'] ) ) {
+		$cas_url = \home_url( '/cas/' . \absint( $data['post_id'] ) . '_cas.json' );
 	}
 
-	if ( '' === $source ) {
-		$source = \home_url();
-	}
+	$page_url = \home_url( '/op-share/' . $hash );
 
-	if ( '' === $author ) {
-		$author = 'Yoshifumi Takeuchi';
-	}
-
-	$description = \function_exists( 'mb_substr' )
+	$description = function_exists( 'mb_substr' )
 		? \mb_substr( $text, 0, 120, 'UTF-8' )
 		: \substr( $text, 0, 120 );
 
-	$cas_url = \home_url( '/cas/op_test.cas.json' );
-	$page_url = \home_url( '/op-share/' . $hash );
-
-	\nocache_headers();
 	\status_header( 200 );
 
 	echo '<!DOCTYPE html>';
 	echo '<html lang="ja" prefix="og: https://ogp.me/ns#">';
 	echo '<head>';
 	echo '<meta charset="UTF-8">';
-	echo '<title>OPを使って共有されたWeb記事の本文ブロック</title>';
+	echo '<title>' . \esc_html( $title ) . '</title>';
+
 	echo '<meta property="og:title" content="共有された本文ブロック">';
 	echo '<meta property="og:type" content="article">';
 	echo '<meta property="og:url" content="' . \esc_url( $page_url ) . '">';
 	echo '<meta property="og:description" content="' . \esc_attr( $description ) . '">';
+
+	$og_image = \plugin_dir_url( dirname( __FILE__ ) ) . 'assets/op-share-card.png?v=2';
+
+	echo '<meta property="og:image" content="' . \esc_url( $og_image ) . '">';
+	echo '<meta name="twitter:card" content="summary">';
+	echo '<meta name="twitter:title" content="共有された本文ブロック">';
+	echo '<meta name="twitter:description" content="' . \esc_attr( $description ) . '">';
+	echo '<meta name="twitter:image" content="' . \esc_url( $og_image ) . '">';
+
 	echo '<meta property="og:op:type" content="TextBlockAttestation">';
 	echo '<meta property="og:op:block_hash" content="' . \esc_attr( $hash ) . '">';
-	echo '<meta property="og:op:cas" content="' . \esc_url( $cas_url ) . '">';
+
+	if ( '' !== $cas_url ) {
+		echo '<meta property="og:op:cas" content="' . \esc_url( $cas_url ) . '">';
+	}
+
 	echo '<meta property="og:op:block_text" content="' . \esc_attr( $text ) . '">';
 	echo '</head>';
+
 	echo '<body>';
 	echo '<h1>OPを使って、Xで共有されたWeb記事のブロック（段落）</h1>';
+
 	echo '<p>' . \nl2br( \esc_html( $text ) ) . '</p>';
 	echo '<hr>';
+
 	echo '<p>発信者 ' . \esc_html( $author ) . '</p>';
-	echo '<p><a href="' . \esc_url( $source ) . '">記事タイトル　' . \esc_html( $title ) . '</a></p>';
+
+	if ( '' !== $source ) {
+		echo '<p><a href="' . \esc_url( $source ) . '">記事タイトル　' . \esc_html( $title ) . '</a></p>';
+	} else {
+		echo '<p>記事タイトル　' . \esc_html( $title ) . '</p>';
+	}
+
 	echo '<p>OPは、Webページの発信者情報と記事の改ざん検証に用いるために開発されたWeb技術で、Originator Profile技術研究組合が開発しています。</p>';
 	echo '<p>この共有ブロックには、発信者情報や改ざん検証に用いるための OP/CAS 情報が付与されています。</p>';
 	echo '<p>このページは、元記事の一部テキストを共有するための OP Block Share ページです。</p>';
 	echo '<p>Block hash: ' . \esc_html( $hash ) . '</p>';
+
 	echo '</body>';
 	echo '</html>';
 
@@ -354,11 +388,77 @@ function opg_meta_tags() {
 	$dir_name = PROFILE_DEFAULT_CA_EXTERNAL_DIR;
 	$url      = \home_url();
 	$endpoint = "{$url}/{$dir_name}/{$post_id}_cas.json";
+	$share_base = \home_url( '/op-share/' );
 
 	echo "\n<!-- OPG / OP metadata -->\n";
 	echo '<meta property="og:op:type" content="ArticleAttestation">' . "\n";
 	echo '<meta property="og:op:cas" content="' . \esc_url( $endpoint ) . '">' . "\n";
+	echo '<meta property="og:op:share_base" content="' . \esc_url( $share_base ) . '">' . "\n";
 	echo "<!-- /OPG / OP metadata -->\n";
+}
+
+/**
+ * Register OP Share REST API.
+ */
+function register_op_share_rest_api() {
+	\register_rest_route(
+		'opg/v1',
+		'/share',
+		array(
+			'methods'             => 'POST',
+			'callback'            => '\Profile\Post\save_op_share_data',
+			'permission_callback' => '__return_true',
+		)
+	);
+}
+
+/**
+ * Save OP Share data by hash.
+ *
+ * Endpoint:
+ * POST /wp-json/opg/v1/share
+ */
+function save_op_share_data( \WP_REST_Request $request ) {
+	$hash   = sanitize_text_field( $request->get_param( 'hash' ) );
+	$text   = sanitize_textarea_field( $request->get_param( 'text' ) );
+	$post_id = absint( $request->get_param( 'post_id' ) );
+
+	$cas_url = esc_url_raw( $request->get_param( 'cas_url' ) );
+	$title   = sanitize_text_field( $request->get_param( 'title' ) );
+	$source  = esc_url_raw( $request->get_param( 'source' ) );
+	$author  = sanitize_text_field( $request->get_param( 'author' ) );
+
+	if ( '' === $hash || '' === $text ) {
+		return new \WP_Error(
+			'opg_share_invalid',
+			'Invalid OP share data.',
+			array( 'status' => 400 )
+		);
+	}
+
+	$data = array(
+		'hash'       => $hash,
+		'text'       => $text,
+		'post_id'    => $post_id,
+		'cas_url'    => $cas_url,
+		'title'      => $title,
+		'source'     => $source,
+		'author'     => $author,
+		'created_at' => current_time( 'mysql' ),
+	);
+
+	$option_key = 'opg_share_' . $hash;
+
+	update_option( $option_key, $data, false );
+
+	return new \WP_REST_Response(
+		array(
+			'ok'        => true,
+			'hash'      => $hash,
+			'share_url' => home_url( '/op-share/' . $hash ),
+		),
+		200
+	);
 }
 
 /**
