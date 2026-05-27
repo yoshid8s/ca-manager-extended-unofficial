@@ -244,6 +244,21 @@ Upload from the WordPress admin screen
 - Select the target content in CA Manager.
 - Save and CAS will be automatically generated.
 
+### Important after installation / update
+
+After installing or updating the plugin, please re-save the WordPress permalink settings once.
+
+WordPress Admin:
+
+`Settings → Permalinks → Save Changes`
+
+This is required to correctly register routes such as:
+
+* `/op-share/{hash}`
+
+If permalinks are not refreshed, OP Block Share pages may return `404 Not Found`.
+
+
 ### Notes
 
 Images containing srcset must match the actual browser DOM.
@@ -256,10 +271,6 @@ Yoshifumi Takeuchi
 ## License:
 
 MIT License
-
-## Notice
-
-This project is based on the official CA Manager developed by the Originator Profile (OP) project, with additional modifications and extensions.
 
 ## Notice
 
@@ -504,6 +515,22 @@ WordPress管理画面からアップロード
 - 投稿編集画面を開く。
 - CAマネージャーで対象コンテンツを選択。
 - 保存するとCASが自動生成される。
+
+### インストール・アップデート後の重要事項
+
+プラグインをインストールまたはアップデートした後は、
+一度 WordPress のパーマリンク設定を保存してください。
+
+WordPress管理画面：
+
+`設定 → パーマリンク → 変更を保存`
+
+これは、以下のようなルートを正しく登録するために必要です。
+
+* `/op-share/{hash}`
+
+パーマリンクを再保存しない場合、
+OP Block Shareページが `404 Not Found` になることがあります。
 
 ### 注意事項
 
