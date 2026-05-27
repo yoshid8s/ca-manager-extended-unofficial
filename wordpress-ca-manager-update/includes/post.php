@@ -319,7 +319,7 @@ function render_op_share_page() {
 	echo '<meta property="og:url" content="' . \esc_url( $page_url ) . '">';
 	echo '<meta property="og:description" content="' . \esc_attr( $description ) . '">';
 
-	$og_image = \plugin_dir_url( dirname( __FILE__ ) ) . 'assets/op-share-card.png?v=2';
+	$og_image = \plugin_dir_url( dirname( __FILE__ ) ) . 'assets/op-share-card-v2.png';
 
 	echo '<meta property="og:image" content="' . \esc_url( $og_image ) . '">';
 	echo '<meta name="twitter:card" content="summary">';
