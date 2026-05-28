@@ -386,8 +386,7 @@ function opg_meta_tags() {
 	}
 
 	$dir_name = PROFILE_DEFAULT_CA_EXTERNAL_DIR;
-	$url      = \home_url();
-	$endpoint = "{$url}/{$dir_name}/{$post_id}_cas.json";
+	$endpoint = \site_url( '/' . trim( $dir_name, '/' ) . "/{$post_id}_cas.json" );
 	$share_base = \home_url( '/op-share/' );
 
 	echo "\n<!-- OPG / OP metadata -->\n";
